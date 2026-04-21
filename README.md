@@ -1,6 +1,6 @@
 # 🌊 Abyssal Flow 
 
-> A calming, ocean-themed period and menstrual cycle tracker built with React Native.
+> A calming, ocean-themed mobile period and menstrual cycle tracker built with React Native.
 
 Traditional period trackers can often feel like a clinical chore. This app is designed to change that by providing a serene, stress-free environment for health tracking. Utilizing a deep-sea aesthetic, the app simulates different states of the ocean to reflect the phases of your cycle, offering a truly immersive and mindful experience.
 
