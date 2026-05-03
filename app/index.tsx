@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { Link } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import Svg, {
   Path,
   Defs,
@@ -71,6 +72,7 @@ const WaveBackground = () => {
 };
 
 export default function LoginPage() {
+  const router = useRouter();
   return (
     <View style={styles.gradient}>
       <WaveBackground />
@@ -148,7 +150,10 @@ export default function LoginPage() {
           </TouchableOpacity>
 
           {/* Log In Button */}
-          <TouchableOpacity style={styles.loginButton}>
+          <TouchableOpacity
+            style={styles.loginButton}
+            onPress={() => router.replace("/(tabs)/dashboard")}
+          >
             <Text style={styles.loginButtonText}>Log In</Text>
           </TouchableOpacity>
         </View>
