@@ -8,15 +8,18 @@ import {
   KeyboardAvoidingView,
   Platform,
   Image,
+  Dimensions,
+  ScrollView,
+  TouchableWithoutFeedback,
+  Keyboard,
 } from "react-native";
-import { Dimensions } from "react-native";
 import Svg, {
   Path,
   Defs,
   LinearGradient as SvgLinearGradient,
   Stop,
 } from "react-native-svg";
-import { Link } from "expo-router";
+import { Link, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 
 const STARS = [
@@ -51,13 +54,11 @@ const WaveBackground = () => {
         d={`M 0,${height * 0.3} Q ${width * 0.25},${height * 0.25} ${width * 0.5},${height * 0.3} T ${width},${height * 0.3} L ${width},${height} L 0,${height} Z`}
         fill="url(#waveGradient)"
       />
-
       <Path
         d={`M 0,${height * 0.4} Q ${width * 0.25},${height * 0.35} ${width * 0.5},${height * 0.4} T ${width},${height * 0.4} L ${width},${height} L 0,${height} Z`}
         fill="#1a5a7d"
         opacity="0.6"
       />
-
       <Path
         d={`M 0,${height * 0.5} Q ${width * 0.25},${height * 0.45} ${width * 0.5},${height * 0.5} T ${width},${height * 0.5} L ${width},${height} L 0,${height} Z`}
         fill="#2a7a9d"
@@ -68,132 +69,141 @@ const WaveBackground = () => {
 };
 
 export default function RegisterPage() {
+  const router = useRouter();
+
   return (
     <View style={styles.gradient}>
       <WaveBackground />
       <KeyboardAvoidingView
-        style={styles.container}
+        style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
-        {/* Decorative stars */}
-        {STARS.map((s, i) => (
-          <Text
-            key={i}
-            style={[
-              styles.star,
-              {
-                top: s.top,
-                left: s.left,
-                fontSize: s.size,
-                opacity: s.opacity,
-                transform: [{ rotate: s.rotate }],
-              },
-            ]}
-          >
-            ✦
-          </Text>
-        ))}
+        <ScrollView
+          contentContainerStyle={styles.scrollContainer}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          bounces={false}
+        >
+          <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+            <View style={styles.innerContainer}>
+              {/* Decorative stars */}
+              {STARS.map((s, i) => (
+                <Text
+                  key={i}
+                  style={[
+                    styles.star,
+                    {
+                      top: s.top,
+                      left: s.left,
+                      fontSize: s.size,
+                      opacity: s.opacity,
+                      transform: [{ rotate: s.rotate }],
+                    },
+                  ]}
+                >
+                  ✦
+                </Text>
+              ))}
 
-        <View style={styles.logoContainer}>
-          <Image
-            source={require("../assets/images/abyssal-logo.png")}
-            style={styles.logo}
-            resizeMode="contain" // This ensures your logo doesn't get stretched!
-          />
-          <Text style={styles.logoText}>Abyssal Flow</Text>
-        </View>
+              <View style={styles.logoContainer}>
+                <Image
+                  source={require("../assets/images/abyssal-logo.png")}
+                  style={styles.logo}
+                  resizeMode="contain"
+                />
+                <Text style={styles.logoText}>Abyssal Flow</Text>
+              </View>
 
-        <View style={styles.formContainer}>
-          <Text style={styles.title}>Dive in</Text>
+              <View style={styles.formContainer}>
+                <Text style={styles.title}>Dive in</Text>
 
-          {/* Username Text Box */}
-          <View style={styles.inputWrapper}>
-            <Ionicons
-              name="person-outline"
-              size={20}
-              color="#4A5568"
-              style={styles.icon}
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Username"
-              placeholderTextColor="#A0AEC0"
-              autoCapitalize="none"
-            />
-          </View>
+                <View style={styles.inputWrapper}>
+                  <Ionicons
+                    name="person-outline"
+                    size={20}
+                    color="#4A5568"
+                    style={styles.icon}
+                  />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Username"
+                    placeholderTextColor="#A0AEC0"
+                    autoCapitalize="none"
+                  />
+                </View>
 
-          {/* Email Text Box */}
-          <View style={styles.inputWrapper}>
-            <Ionicons
-              name="mail-outline"
-              size={20}
-              color="#4A5568"
-              style={styles.icon}
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Email"
-              placeholderTextColor="#A0AEC0"
-              keyboardType="email-address"
-              autoCapitalize="none"
-            />
-          </View>
+                <View style={styles.inputWrapper}>
+                  <Ionicons
+                    name="mail-outline"
+                    size={20}
+                    color="#4A5568"
+                    style={styles.icon}
+                  />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Email"
+                    placeholderTextColor="#A0AEC0"
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                  />
+                </View>
 
-          {/* Password Text Box */}
-          <View style={styles.inputWrapper}>
-            <Ionicons
-              name="lock-closed-outline"
-              size={20}
-              color="#4A5568"
-              style={styles.icon}
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Password"
-              placeholderTextColor="#A0AEC0"
-              secureTextEntry
-            />
-          </View>
+                <View style={styles.inputWrapper}>
+                  <Ionicons
+                    name="lock-closed-outline"
+                    size={20}
+                    color="#4A5568"
+                    style={styles.icon}
+                  />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Password"
+                    placeholderTextColor="#A0AEC0"
+                    secureTextEntry
+                  />
+                </View>
 
-          {/* Confirm Password Text Box */}
-          <View style={styles.inputWrapper}>
-            <Ionicons
-              name="lock-closed-outline"
-              size={20}
-              color="#4A5568"
-              style={styles.icon}
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Confirm password"
-              placeholderTextColor="#A0AEC0"
-              secureTextEntry
-            />
-          </View>
+                <View style={styles.inputWrapper}>
+                  <Ionicons
+                    name="lock-closed-outline"
+                    size={20}
+                    color="#4A5568"
+                    style={styles.icon}
+                  />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Confirm password"
+                    placeholderTextColor="#A0AEC0"
+                    secureTextEntry
+                  />
+                </View>
 
-          {/* Terms and Privacy */}
-          <Text style={styles.termsText}>
-            By diving in, you agree to our{" "}
-            <Text style={styles.termsLink}>
-              Terms of Service and Privacy Policy.
-            </Text>
-          </Text>
+                <Text style={styles.termsText}>
+                  By diving in, you agree to our{" "}
+                  <Text style={styles.termsLink}>
+                    Terms of Service and Privacy Policy.
+                  </Text>
+                </Text>
 
-          {/* Sign Up Button */}
-          <TouchableOpacity style={styles.signUpButton}>
-            <Text style={styles.signUpButtonText}>Sign Up</Text>
-          </TouchableOpacity>
-        </View>
+                <TouchableOpacity
+                  style={styles.signUpButton}
+                  onPress={() => router.push("/landing1")}
+                >
+                  <Text style={styles.signUpButtonText}>Sign Up</Text>
+                </TouchableOpacity>
+              </View>
 
-        {/* Bottom Footer Link */}
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>Already have an account? </Text>
-          <Link href="/" asChild>
-            <TouchableOpacity>
-              <Text style={styles.footerLink}>Dive Back In.</Text>
-            </TouchableOpacity>
-          </Link>
-        </View>
+              <View style={styles.footer}>
+                <Text style={styles.footerText}>Already have an account? </Text>
+                <Link href="/" asChild>
+                  <TouchableOpacity>
+                    <Text style={styles.footerLink}>Dive Back In.</Text>
+                  </TouchableOpacity>
+                </Link>
+              </View>
+            </View>
+          </TouchableWithoutFeedback>
+        </ScrollView>
       </KeyboardAvoidingView>
     </View>
   );
@@ -203,7 +213,10 @@ const styles = StyleSheet.create({
   gradient: {
     flex: 1,
   },
-  container: {
+  scrollContainer: {
+    flexGrow: 1,
+  },
+  innerContainer: {
     flex: 1,
     justifyContent: "space-between",
   },
@@ -216,14 +229,14 @@ const styles = StyleSheet.create({
   },
   logoContainer: {
     height: 220,
-    marginTop: -10, // Adjust this up or down to move the logo
-    alignItems: "center", // Centers the logo horizontally
+    marginTop: -10,
+    alignItems: "center",
     justifyContent: "flex-start",
     flexDirection: "column",
   },
   logo: {
-    width: 400, // Change this to make the logo wider/thinner
-    height: 310, // Change this to make the logo taller/shorter
+    width: 400,
+    height: 310,
   },
   logoText: {
     fontSize: 10,

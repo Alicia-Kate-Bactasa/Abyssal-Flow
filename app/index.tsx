@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   StyleSheet,
   Text,
@@ -9,6 +9,9 @@ import {
   Platform,
   Dimensions,
   Image,
+  ScrollView,
+  TouchableWithoutFeedback,
+  Keyboard,
 } from "react-native";
 import { Link } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -48,20 +51,15 @@ const WaveBackground = () => {
         </SvgLinearGradient>
       </Defs>
 
-      {/* Background */}
       <Path
         d={`M 0,${height * 0.3} Q ${width * 0.25},${height * 0.25} ${width * 0.5},${height * 0.3} T ${width},${height * 0.3} L ${width},${height} L 0,${height} Z`}
         fill="url(#waveGradient)"
       />
-
-      {/* First wave layer */}
       <Path
         d={`M 0,${height * 0.4} Q ${width * 0.25},${height * 0.35} ${width * 0.5},${height * 0.4} T ${width},${height * 0.4} L ${width},${height} L 0,${height} Z`}
         fill="#1a5a7d"
         opacity="0.6"
       />
-
-      {/* Second wave layer */}
       <Path
         d={`M 0,${height * 0.5} Q ${width * 0.25},${height * 0.45} ${width * 0.5},${height * 0.5} T ${width},${height * 0.5} L ${width},${height} L 0,${height} Z`}
         fill="#2a7a9d"
@@ -73,100 +71,107 @@ const WaveBackground = () => {
 
 export default function LoginPage() {
   const router = useRouter();
+
   return (
     <View style={styles.gradient}>
       <WaveBackground />
       <KeyboardAvoidingView
-        style={styles.container}
+        style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
-        {/* Decorative stars */}
-        {STARS.map((s, i) => (
-          <Text
-            key={i}
-            style={[
-              styles.star,
-              {
-                top: s.top,
-                left: s.left,
-                fontSize: s.size,
-                opacity: s.opacity,
-                transform: [{ rotate: s.rotate }],
-              },
-            ]}
-          >
-            ✦
-          </Text>
-        ))}
+        <ScrollView
+          contentContainerStyle={styles.scrollContainer}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          bounces={false}
+        >
+          <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+            <View style={styles.innerContainer}>
+              {/* Decorative stars */}
+              {STARS.map((s, i) => (
+                <Text
+                  key={i}
+                  style={[
+                    styles.star,
+                    {
+                      top: s.top,
+                      left: s.left,
+                      fontSize: s.size,
+                      opacity: s.opacity,
+                      transform: [{ rotate: s.rotate }],
+                    },
+                  ]}
+                >
+                  ✦
+                </Text>
+              ))}
 
-        <View style={styles.logoContainer}>
-          <Image
-            source={require("../assets/images/abyssal-logo.png")}
-            style={styles.logo}
-            resizeMode="contain" // This ensures your logo doesn't get stretched!
-          />
-          <Text style={styles.logoText}>Abyssal Flow</Text>
-        </View>
+              <View style={styles.logoContainer}>
+                <Image
+                  source={require("../assets/images/abyssal-logo.png")}
+                  style={styles.logo}
+                  resizeMode="contain"
+                />
+                <Text style={styles.logoText}>Abyssal Flow</Text>
+              </View>
 
-        <View style={styles.formContainer}>
-          <Text style={styles.title}>Return to the Deep</Text>
+              <View style={styles.formContainer}>
+                <Text style={styles.title}>Return to the Deep</Text>
 
-          {/* Email Text Box */}
-          <View style={styles.inputWrapper}>
-            <Ionicons
-              name="mail-outline"
-              size={20}
-              color="#4A5568"
-              style={styles.icon}
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Email"
-              placeholderTextColor="#A0AEC0"
-              keyboardType="email-address"
-              autoCapitalize="none"
-            />
-          </View>
+                <View style={styles.inputWrapper}>
+                  <Ionicons
+                    name="mail-outline"
+                    size={20}
+                    color="#4A5568"
+                    style={styles.icon}
+                  />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Email"
+                    placeholderTextColor="#A0AEC0"
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                  />
+                </View>
 
-          {/* Password Text Box */}
-          <View style={styles.inputWrapper}>
-            <Ionicons
-              name="lock-closed-outline"
-              size={20}
-              color="#4A5568"
-              style={styles.icon}
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Password"
-              placeholderTextColor="#A0AEC0"
-              secureTextEntry
-            />
-          </View>
+                <View style={styles.inputWrapper}>
+                  <Ionicons
+                    name="lock-closed-outline"
+                    size={20}
+                    color="#4A5568"
+                    style={styles.icon}
+                  />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Password"
+                    placeholderTextColor="#A0AEC0"
+                    secureTextEntry
+                  />
+                </View>
 
-          {/* Forgot Password Link */}
-          <TouchableOpacity style={styles.forgotWrapper}>
-            <Text style={styles.forgotText}>Forgot Password?</Text>
-          </TouchableOpacity>
+                <TouchableOpacity style={styles.forgotWrapper}>
+                  <Text style={styles.forgotText}>Forgot Password?</Text>
+                </TouchableOpacity>
 
-          {/* Log In Button */}
-          <TouchableOpacity
-            style={styles.loginButton}
-            onPress={() => router.replace("/(tabs)/dashboard")}
-          >
-            <Text style={styles.loginButtonText}>Log In</Text>
-          </TouchableOpacity>
-        </View>
+                <TouchableOpacity
+                  style={styles.loginButton}
+                  onPress={() => router.replace("/(tabs)/dashboard")}
+                >
+                  <Text style={styles.loginButtonText}>Log In</Text>
+                </TouchableOpacity>
+              </View>
 
-        {/* Bottom Footer Link */}
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>New to the depths? </Text>
-          <Link href="/register" asChild>
-            <TouchableOpacity>
-              <Text style={styles.footerLink}>Start Your Journey.</Text>
-            </TouchableOpacity>
-          </Link>
-        </View>
+              <View style={styles.footer}>
+                <Text style={styles.footerText}>New to the depths? </Text>
+                <Link href="/register" asChild>
+                  <TouchableOpacity>
+                    <Text style={styles.footerLink}>Start Your Journey.</Text>
+                  </TouchableOpacity>
+                </Link>
+              </View>
+            </View>
+          </TouchableWithoutFeedback>
+        </ScrollView>
       </KeyboardAvoidingView>
     </View>
   );
@@ -176,7 +181,10 @@ const styles = StyleSheet.create({
   gradient: {
     flex: 1,
   },
-  container: {
+  scrollContainer: {
+    flexGrow: 1,
+  },
+  innerContainer: {
     flex: 1,
     justifyContent: "space-between",
   },
@@ -187,17 +195,16 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 6,
   },
-
   logoContainer: {
     height: 220,
-    marginTop: 40, // Adjust this up or down to move the logo
-    alignItems: "center", // Centers the logo horizontally
+    marginTop: 40,
+    alignItems: "center",
     justifyContent: "flex-start",
     flexDirection: "column",
   },
   logo: {
-    width: 400, // Change this to make the logo wider/thinner
-    height: 310, // Change this to make the logo taller/shorter
+    width: 400,
+    height: 310,
   },
   logoText: {
     fontSize: 10,
@@ -209,11 +216,10 @@ const styles = StyleSheet.create({
     fontFamily: Platform.OS === "ios" ? "Courier" : "monospace",
     letterSpacing: 2,
   },
-
   formContainer: {
     paddingHorizontal: 30,
     width: "100%",
-    marginTop: 0, // Pull the form up a bit to overlap with the logo
+    marginTop: 0,
   },
   title: {
     fontSize: 28,

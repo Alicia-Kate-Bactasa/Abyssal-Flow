@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useCallback } from "react";
+import React, { useRef, useEffect, useCallback, useState } from "react";
 import {
   View,
   StyleSheet,
@@ -10,65 +10,121 @@ import {
 import * as Haptics from "expo-haptics";
 import AbyssalBackground from "../../components/AbyssalBackground";
 
-const { width } = Dimensions.get("window");
+const { width, height } = Dimensions.get("window");
 
-const MOON_SIZE = width * 0.7;
-const WRAPPER_SIZE = width * 1.4;
-const DAY_CIRCLE_RADIUS = MOON_SIZE / 2 + 35;
+const MOON_SIZE = width * 0.85;
+const WRAPPER_SIZE = width * 1.6;
+const DAY_CIRCLE_RADIUS = MOON_SIZE / 2 + 25;
+
+// The exact center coordinates of your moon dial on the screen
+const DIAL_CENTER_X = width / 2;
+const DIAL_CENTER_Y = height * 0.28 + WRAPPER_SIZE / 2;
+
+const DECAY_DECELERATION = 0.9965;
+const WEEKDAYS = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
 
 // ==========================================
-// 1. THE MINI-COMPONENT
+// 1. THE MINI-COMPONENT (Infinite Momentum Dial)
 // ==========================================
-const CircularCalendarDial = () => {
-  const now = new Date();
-  const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth();
-  const currentDay = now.getDate();
+const CircularCalendarDial = ({
+  onDayChange,
+}: {
+  onDayChange: (day: number) => void;
+}) => {
+  const [viewDate, setViewDate] = useState(new Date());
+
+  const currentYear = viewDate.getFullYear();
+  const currentMonth = viewDate.getMonth();
+  const currentDay = new Date().getDate();
   const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
-  const monthName = now
-    .toLocaleString("default", { month: "long" })
-    .toUpperCase();
 
   const angleSlice = 360 / daysInMonth;
-  const initialRotationAngle = -(currentDay - 1) * angleSlice;
+
+  const isCurrentMonth =
+    new Date().getMonth() === currentMonth &&
+    new Date().getFullYear() === currentYear;
+  const initialRotationAngle = isCurrentMonth
+    ? -(currentDay - 1) * angleSlice
+    : 0;
 
   const rotationAngle = useRef(
     new Animated.Value(initialRotationAngle),
   ).current;
-
-  // NEW: This ref tracks the EXACT live angle of the wheel to prevent jumping
   const currentAngleRef = useRef(initialRotationAngle);
-  const inactivityTimer = useRef<number | null>(null);
 
-  // --- HAPTIC & LIVE ANGLE TRACKER ---
+  // NEW: Tracks the exact radian angle of your finger on the previous frame
+  const previousAngleRef = useRef(0);
+
+  const inactivityTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastTickRef = useRef(Math.round(initialRotationAngle / angleSlice));
+
   useEffect(() => {
-    let lastTick = Math.round(initialRotationAngle / angleSlice);
-    const listenerId = rotationAngle.addListener(({ value }) => {
-      currentAngleRef.current = value; // Continuously update our live tracker!
+    const id = rotationAngle.addListener(({ value }) => {
+      currentAngleRef.current = value;
 
-      const currentTick = Math.round(value / angleSlice);
-      if (currentTick !== lastTick) {
+      const tick = Math.round(-value / angleSlice);
+      if (tick !== lastTickRef.current) {
+        lastTickRef.current = tick;
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        lastTick = currentTick;
+        const liveDay = tick + 1;
+        if (liveDay >= 1 && liveDay <= daysInMonth) {
+          onDayChange(liveDay);
+        }
       }
     });
-    return () => rotationAngle.removeListener(listenerId);
-  }, []);
+    return () => rotationAngle.removeListener(id);
+  }, [angleSlice, daysInMonth, onDayChange, rotationAngle]);
+
+  const snapToNearest = useCallback(
+    (fromVelocityDegPerMs = 0) => {
+      const raw = currentAngleRef.current;
+      const snapped = Math.round(raw / angleSlice) * angleSlice;
+
+      Animated.spring(rotationAngle, {
+        toValue: snapped,
+        velocity: fromVelocityDegPerMs,
+        useNativeDriver: true,
+        tension: 60,
+        friction: 10,
+      }).start(({ finished }) => {
+        if (finished) {
+          const landedIndex = Math.round(-snapped / angleSlice);
+          if (landedIndex >= daysInMonth) {
+            setViewDate(new Date(currentYear, currentMonth + 1, 1));
+            rotationAngle.setValue(0);
+          } else if (landedIndex < 0) {
+            const prevDays = new Date(currentYear, currentMonth, 0).getDate();
+            setViewDate(new Date(currentYear, currentMonth - 1, 1));
+            rotationAngle.setValue(-(prevDays - 1) * (360 / prevDays));
+          }
+          startInactivityTimer();
+        }
+      });
+    },
+    [angleSlice, daysInMonth, currentYear, currentMonth, rotationAngle],
+  );
 
   const resetToToday = useCallback(() => {
+    const today = new Date();
+    setViewDate(today);
+    const targetDays = new Date(
+      today.getFullYear(),
+      today.getMonth() + 1,
+      0,
+    ).getDate();
+    const targetAngle = -(today.getDate() - 1) * (360 / targetDays);
+
     Animated.spring(rotationAngle, {
-      toValue: initialRotationAngle,
+      toValue: targetAngle,
       useNativeDriver: true,
       tension: 40,
       friction: 8,
     }).start();
-  }, [rotationAngle, initialRotationAngle]);
+  }, [rotationAngle]);
 
   const startInactivityTimer = useCallback(() => {
     if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
-    inactivityTimer.current = setTimeout(() => {
-      resetToToday();
-    }, 5000);
+    inactivityTimer.current = setTimeout(resetToToday, 5000);
   }, [resetToToday]);
 
   useEffect(() => {
@@ -78,49 +134,82 @@ const CircularCalendarDial = () => {
     };
   }, [startInactivityTimer]);
 
-  // --- RESPONSIVE PAN RESPONDER ---
   const panResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onPanResponderGrant: () => {
+      // Claim the gesture if the user moves their finger in ANY direction by 5 pixels
+      onMoveShouldSetPanResponder: (_evt, gs) => {
+        const distance = Math.sqrt(gs.dx * gs.dx + gs.dy * gs.dy);
+        return distance > 5;
+      },
+      onStartShouldSetPanResponder: () => false,
+
+      onPanResponderGrant: (_evt, gs) => {
         if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
+        rotationAngle.stopAnimation((stoppedAt) => {
+          currentAngleRef.current = stoppedAt;
+        });
 
-        // NEW: Stop the wheel instantly if the user grabs it while it's snapping
-        rotationAngle.stopAnimation();
-
-        // NEW: Use the perfectly accurate live ref for the offset
-        rotationAngle.setOffset(currentAngleRef.current);
-        rotationAngle.setValue(0);
+        // Calculate the exact starting angle using Math.atan2
+        const rx = gs.x0 - DIAL_CENTER_X;
+        const ry = gs.y0 - DIAL_CENTER_Y;
+        previousAngleRef.current = Math.atan2(ry, rx);
       },
-      onPanResponderMove: (evt, gestureState) => {
-        // Slowed down the speed to 0.5 for a "heavier", smoother feel
-        const rotationSpeed = 0.5;
-        rotationAngle.setValue(gestureState.dx * rotationSpeed);
+
+      onPanResponderMove: (_evt, gs) => {
+        // Calculate the new angle on this frame
+        const rx = gs.moveX - DIAL_CENTER_X;
+        const ry = gs.moveY - DIAL_CENTER_Y;
+        const currentAngle = Math.atan2(ry, rx);
+
+        // Find out how many radians the finger moved
+        let deltaAngle = currentAngle - previousAngleRef.current;
+
+        // Fix the math wrap-around (when crossing the left side of the circle)
+        if (deltaAngle > Math.PI) deltaAngle -= 2 * Math.PI;
+        if (deltaAngle < -Math.PI) deltaAngle += 2 * Math.PI;
+
+        // Convert radians to degrees and add it to our wheel!
+        const deltaDeg = deltaAngle * (180 / Math.PI);
+        currentAngleRef.current += deltaDeg;
+        rotationAngle.setValue(currentAngleRef.current);
+
+        // Save this angle for the next frame
+        previousAngleRef.current = currentAngle;
       },
-      onPanResponderRelease: () => {
-        rotationAngle.flattenOffset();
 
-        // Use the live ref to calculate the snap!
-        const snapAngle =
-          Math.round(currentAngleRef.current / angleSlice) * angleSlice;
+      onPanResponderRelease: (_evt, gs) => {
+        const rx = gs.moveX - DIAL_CENTER_X;
+        const ry = gs.moveY - DIAL_CENTER_Y;
+        const rSquared = rx * rx + ry * ry;
 
-        Animated.spring(rotationAngle, {
-          toValue: snapAngle,
+        // Angular Velocity Physics Formula: ω = (r_x * v_y - r_y * v_x) / r^2
+        let angularVelocityRadPerMs = 0;
+        if (rSquared > 0) {
+          angularVelocityRadPerMs = (rx * gs.vy - ry * gs.vx) / rSquared;
+        }
+
+        const velocityDegPerMs = angularVelocityRadPerMs * (180 / Math.PI);
+
+        Animated.decay(rotationAngle, {
+          velocity: velocityDegPerMs,
+          deceleration: DECAY_DECELERATION,
           useNativeDriver: true,
-          tension: 60,
-          friction: 8,
         }).start(({ finished }) => {
           if (finished) {
-            startInactivityTimer();
+            snapToNearest(0);
           }
         });
+      },
+
+      onPanResponderTerminate: () => {
+        snapToNearest(0);
       },
     }),
   ).current;
 
   const rotateInterpolate = rotationAngle.interpolate({
-    inputRange: [-3600, 3600],
-    outputRange: ["-3600deg", "3600deg"],
+    inputRange: [-10000, 10000],
+    outputRange: ["-10000deg", "10000deg"],
   });
 
   const generateDayElements = () => {
@@ -130,16 +219,18 @@ const CircularCalendarDial = () => {
       const radians = (angle * Math.PI) / 180;
       const x = Math.cos(radians) * DAY_CIRCLE_RADIUS;
       const y = Math.sin(radians) * DAY_CIRCLE_RADIUS;
-      const isToday = day === currentDay;
+
+      const dateForDay = new Date(currentYear, currentMonth, day);
+      const dayName = WEEKDAYS[dateForDay.getDay()];
 
       days.push(
         <View
-          key={day}
+          key={`${currentYear}-${currentMonth}-${day}`}
           style={[
             styles.dayContainer,
             {
-              top: WRAPPER_SIZE / 2 - 25,
-              left: WRAPPER_SIZE / 2 - 25,
+              top: WRAPPER_SIZE / 2 - 30,
+              left: WRAPPER_SIZE / 2 - 30,
               transform: [
                 { translateX: x },
                 { translateY: y },
@@ -148,10 +239,9 @@ const CircularCalendarDial = () => {
             },
           ]}
         >
-          <View style={[styles.dayCircle, isToday && styles.dayCircleActive]}>
-            <Text style={[styles.dayText, isToday && styles.dayTextActive]}>
-              {day}
-            </Text>
+          <Text style={styles.weekdayLabel}>{dayName}</Text>
+          <View style={styles.dayNumberCircle}>
+            <Text style={styles.dayNumberText}>{day}</Text>
           </View>
         </View>,
       );
@@ -168,12 +258,9 @@ const CircularCalendarDial = () => {
         ]}
         {...panResponder.panHandlers}
       >
-        <View style={styles.moon} />
+        <View style={styles.moonGlowCore} pointerEvents="none" />
         {generateDayElements()}
       </Animated.View>
-      <Text style={styles.monthIndicator}>
-        {monthName} {currentYear}
-      </Text>
     </View>
   );
 };
@@ -182,27 +269,37 @@ const CircularCalendarDial = () => {
 // 2. THE MAIN SCREEN EXPORT
 // ==========================================
 export default function Dashboard() {
+  const [activeDay, setActiveDay] = useState(new Date().getDate());
+  const [footerDate] = useState(new Date());
+
   return (
     <AbyssalBackground
       middleLayer={
         <View style={styles.moonWrapper}>
-          <CircularCalendarDial />
+          <CircularCalendarDial onDayChange={setActiveDay} />
         </View>
       }
     >
-      <View style={styles.topSection}>
-        <View style={styles.headerContent}>
+      <View style={styles.contentOverlay} pointerEvents="box-none">
+        <View style={styles.header} pointerEvents="box-none">
           <Text style={styles.greeting}>Hello, ishie!</Text>
           <Text style={styles.subGreeting}>your period is in 4 days</Text>
-          <View style={styles.separator} />
+          <View style={styles.divider} />
           <Text style={styles.phaseTitle}>Current Phase: Luteal</Text>
+          <Text style={styles.phaseDescription}>
+            The ocean deepens under fading light. Your energy slows as your body
+            prepares to reset. Take things gently today.
+          </Text>
         </View>
-      </View>
 
-      <View style={styles.bottomSection}>
-        <View style={styles.bottomContent}>
-          <Text style={styles.dayNumber}>DAY 20</Text>
-          <Text style={styles.dayLabel}>of cycle</Text>
+        <View style={styles.bottomInfo} pointerEvents="none">
+          <Text style={styles.bigDayText}>DAY {activeDay}</Text>
+          <Text style={styles.ofCycle}>of cycle</Text>
+          <Text style={styles.monthFooter}>
+            {footerDate
+              .toLocaleString("default", { month: "long" })
+              .toUpperCase()}
+          </Text>
         </View>
       </View>
     </AbyssalBackground>
@@ -210,20 +307,62 @@ export default function Dashboard() {
 }
 
 // ==========================================
-// 3. STYLES
+// 3. STYLES (Untouched)
 // ==========================================
 const styles = StyleSheet.create({
-  topSection: { flex: 1.2 },
   moonWrapper: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: "center",
     alignItems: "center",
-    // REMOVED zIndex: 10 so it properly hides behind the wave!
   },
-  bottomSection: { flex: 1 },
-
+  contentOverlay: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 130,
+    zIndex: 100,
+  },
+  header: {
+    alignItems: "center",
+    paddingHorizontal: 40,
+  },
+  greeting: {
+    fontFamily: "Georgia",
+    fontSize: 32,
+    color: "white",
+    marginBottom: 8,
+  },
+  subGreeting: {
+    fontFamily: "monospace",
+    fontSize: 14,
+    color: "#E1F2FF",
+    letterSpacing: 1,
+  },
+  divider: {
+    width: width * 0.6,
+    height: 1,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    marginVertical: 25,
+  },
+  phaseTitle: {
+    fontFamily: "Georgia",
+    fontSize: 18,
+    color: "white",
+    marginBottom: 12,
+  },
+  phaseDescription: {
+    fontFamily: "monospace",
+    fontSize: 11,
+    textAlign: "center",
+    color: "#E1F2FF",
+    lineHeight: 16,
+    opacity: 0.8,
+  },
   dialContainer: {
-    width: "100%",
+    position: "absolute",
+    top: height * 0.28,
+    width: WRAPPER_SIZE,
+    height: WRAPPER_SIZE,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -231,102 +370,70 @@ const styles = StyleSheet.create({
     width: WRAPPER_SIZE,
     height: WRAPPER_SIZE,
     borderRadius: WRAPPER_SIZE / 2,
-    position: "relative",
+    justifyContent: "center",
+    alignItems: "center",
   },
-  moon: {
+  moonGlowCore: {
+    position: "absolute",
     width: MOON_SIZE,
     height: MOON_SIZE,
     borderRadius: MOON_SIZE / 2,
     backgroundColor: "#FFFFFF",
     shadowColor: "#FFFFFF",
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.6,
-    shadowRadius: 20,
-    elevation: 15,
-    position: "absolute",
-    top: (WRAPPER_SIZE - MOON_SIZE) / 2,
-    left: (WRAPPER_SIZE - MOON_SIZE) / 2,
+    shadowRadius: 50,
+    shadowOpacity: 0.8,
+    elevation: 30,
   },
   dayContainer: {
     position: "absolute",
-    width: 50,
-    height: 50,
-    justifyContent: "center",
     alignItems: "center",
-  },
-  dayCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 60,
+    height: 60,
     justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "transparent",
   },
-  dayCircleActive: { backgroundColor: "#1A237E" },
-  dayText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#A0B4D0",
-    textAlign: "center",
-  },
-  dayTextActive: { color: "#FFFFFF", fontSize: 15, fontWeight: "700" },
-  monthIndicator: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#FFFFFF",
-    marginTop: 30,
-    letterSpacing: 3,
+  weekdayLabel: {
+    color: "white",
+    fontSize: 9,
     fontFamily: "monospace",
+    marginBottom: 2,
+    opacity: 0.7,
   },
-
-  // Typography Styles
-  headerContent: {
+  dayNumberCircle: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    justifyContent: "center",
     alignItems: "center",
-    marginTop: 80,
   },
-  greeting: {
-    fontSize: 32,
-    fontWeight: "bold",
-    color: "#FFFFFF",
-    letterSpacing: 1,
+  dayNumberText: {
+    color: "white",
+    fontSize: 18,
+    fontFamily: "Georgia",
   },
-  subGreeting: {
-    fontSize: 16,
-    color: "#A0B4D0",
-    marginTop: 5,
-    marginBottom: 15,
-  },
-  separator: {
-    width: 40,
-    height: 2,
-    backgroundColor: "#64B5F6",
-    marginBottom: 15,
-    borderRadius: 2,
-  },
-  phaseTitle: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#FFFFFF",
-    letterSpacing: 1.5,
-    textTransform: "uppercase",
-  },
-  bottomContent: {
-    flex: 1,
-    justifyContent: "flex-end",
+  bottomInfo: {
     alignItems: "center",
-    paddingBottom: 40,
+    marginBottom: 60,
   },
-  dayNumber: {
-    fontSize: 28,
-    fontWeight: "bold",
-    color: "#FFFFFF",
+  bigDayText: {
+    fontFamily: "Georgia",
+    fontSize: 52,
+    color: "white",
     letterSpacing: 2,
   },
-  dayLabel: {
+  ofCycle: {
+    fontFamily: "monospace",
     fontSize: 14,
-    color: "#E0E0E0",
-    letterSpacing: 1,
-    marginTop: 2,
-    textTransform: "uppercase",
+    color: "white",
+    opacity: 0.8,
+    marginTop: -5,
+  },
+  monthFooter: {
+    fontFamily: "monospace",
+    fontSize: 12,
+    color: "white",
+    marginTop: 30,
+    letterSpacing: 3,
+    opacity: 0.7,
   },
 });

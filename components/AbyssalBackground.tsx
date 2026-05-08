@@ -13,7 +13,7 @@ const AbyssalBackground: React.FC<AbyssalBackgroundProps> = ({
   middleLayer,
 }) => {
   const { width, height } = Dimensions.get("window");
-  const waveHeight = height * 0.5;
+  const waveHeight = height * 0.65;
 
   return (
     <View style={styles.container}>
