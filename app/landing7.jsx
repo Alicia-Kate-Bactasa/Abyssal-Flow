@@ -18,16 +18,17 @@ import WaveBackground from "@/components/WaveBackground";
 
 const { height } = Dimensions.get("window");
 
-const OPTIONS = [
-  { id: "yes", label: "Yes, regularly" },
-  { id: "sometimes", label: "Only when there is an issue" },
-  { id: "no", label: "No, not recently" },
+const MEDICATIONS = [
+  { id: "birth_control", label: "Birth Control (Pill, Patch, Ring)" },
+  { id: "hormonal", label: "Hormonal Supplements" },
+  { id: "painkillers", label: "Painkillers for cramps" },
+  { id: "none", label: "None" },
 ];
 
-export default function Landing6() {
+export default function Landing7() {
   const router = useRouter();
   const params = useLocalSearchParams();
-  const [selected, setSelected] = useState(null);
+  const [selected, setSelected] = useState([]);
 
   const titleOpacity = useRef(new Animated.Value(0)).current;
   const titleY = useRef(new Animated.Value(24)).current;
@@ -67,6 +68,20 @@ export default function Landing6() {
     ]).start();
   }, []);
 
+  const handleSelect = (id) => {
+    if (id === "none") {
+      setSelected(["none"]);
+      return;
+    }
+    setSelected((prev) => {
+      const withoutNone = prev.filter((i) => i !== "none");
+      if (withoutNone.includes(id)) {
+        return withoutNone.filter((i) => i !== id);
+      }
+      return [...withoutNone, id];
+    });
+  };
+
   return (
     <View style={styles.gradient}>
       <StatusBar barStyle="light-content" />
@@ -86,6 +101,7 @@ export default function Landing6() {
         >
           <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
             <View style={styles.innerContainer}>
+
               {/* ── Content ── */}
               <View style={styles.content}>
                 {/* Title */}
@@ -98,31 +114,30 @@ export default function Landing6() {
                     },
                   ]}
                 >
-                  Medical Checkups
+                  Current Medications
                 </Animated.Text>
 
                 {/* Subtitle */}
                 <Animated.Text
                   style={[styles.subtitle, { opacity: subtitleOpacity }]}
                 >
-                  Do you see a doctor or OB-GYN regularly for your period
-                  health?
+                  Are you taking any of these?
                 </Animated.Text>
 
                 {/* Options */}
                 <Animated.View
                   style={[styles.listContainer, { opacity: listOpacity }]}
                 >
-                  {OPTIONS.map((option) => {
-                    const isSelected = selected === option.id;
+                  {MEDICATIONS.map((med) => {
+                    const isSelected = selected.includes(med.id);
                     return (
                       <TouchableOpacity
-                        key={option.id}
+                        key={med.id}
                         style={[
                           styles.optionRow,
                           isSelected && styles.optionRowSelected,
                         ]}
-                        onPress={() => setSelected(option.id)}
+                        onPress={() => handleSelect(med.id)}
                         activeOpacity={0.8}
                       >
                         <View
@@ -131,7 +146,9 @@ export default function Landing6() {
                             isSelected && styles.radioDotSelected,
                           ]}
                         >
-                          {isSelected && <View style={styles.radioDotInner} />}
+                          {isSelected && (
+                            <View style={styles.radioDotInner} />
+                          )}
                         </View>
                         <Text
                           style={[
@@ -139,7 +156,7 @@ export default function Landing6() {
                             isSelected && styles.optionLabelSelected,
                           ]}
                         >
-                          {option.label}
+                          {med.label}
                         </Text>
                       </TouchableOpacity>
                     );
@@ -152,12 +169,15 @@ export default function Landing6() {
                 style={[styles.buttonContainer, { opacity: buttonOpacity }]}
               >
                 <TouchableOpacity
-                  style={[styles.button, !selected && styles.buttonDisabled]}
+                  style={[
+                    styles.button,
+                    selected.length === 0 && styles.buttonDisabled,
+                  ]}
                   onPress={() => {
-                    if (selected) {
+                    if (selected.length > 0) {
                       router.push({
-                        pathname: "/landing7",
-                        params: { ...params, medicalCheckups: selected },
+                        pathname: "/landing8",
+                        params: { ...params, medications: selected.join(",") },
                       });
                     }
                   }}
@@ -166,6 +186,7 @@ export default function Landing6() {
                   <Text style={styles.buttonText}>Next</Text>
                 </TouchableOpacity>
               </Animated.View>
+
             </View>
           </TouchableWithoutFeedback>
         </ScrollView>
@@ -201,8 +222,8 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontFamily: Platform.OS === "ios" ? "Courier New" : "monospace",
-    fontSize: 15,
-    lineHeight: 22,
+    fontSize: 12,
+    lineHeight: 16,
     letterSpacing: 0.8,
     color: "#E1F2FF",
     marginBottom: 24,
@@ -216,7 +237,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "#FFFFFF",
     borderRadius: 18,
-    height: 55, // Increased height to match Landing 5
+    height: 55,
     paddingHorizontal: 14,
     borderWidth: 2,
     borderColor: "transparent",
@@ -249,7 +270,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "300",
     color: "#001242",
-    textAlign: "left", // Left-aligned text
+    textAlign: "left",
   },
   optionLabelSelected: {
     fontWeight: "600",
