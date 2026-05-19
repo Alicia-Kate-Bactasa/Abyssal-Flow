@@ -8,8 +8,8 @@ import {
   Dimensions,
   Animated,
   StatusBar,
-  KeyboardAvoidingView,
   Platform,
+  KeyboardAvoidingView,
   ScrollView,
   TouchableWithoutFeedback,
   Keyboard,
@@ -18,16 +18,17 @@ import WaveBackground from "@/components/WaveBackground";
 
 const { height } = Dimensions.get("window");
 
-const OPTIONS = [
-  { id: "yes", label: "Yes, regularly" },
-  { id: "sometimes", label: "Only when there is an issue" },
-  { id: "no", label: "No, not recently" },
+const FOODS = [
+  { id: "sweet", label: "Sweet (Chocolates/Candy)" },
+  { id: "salty", label: "Salty (Chips/Fries)" },
+  { id: "savory", label: "Savory (Heavy Meals)" },
+  { id: "spicy", label: "Spicy (Hot foods)" },
 ];
 
-export default function Landing6() {
+export default function Landing13() {
   const router = useRouter();
   const params = useLocalSearchParams();
-  const [selected, setSelected] = useState(null);
+  const [selected, setSelected] = useState([]);
 
   const titleOpacity = useRef(new Animated.Value(0)).current;
   const titleY = useRef(new Animated.Value(24)).current;
@@ -38,34 +39,20 @@ export default function Landing6() {
   useEffect(() => {
     Animated.stagger(150, [
       Animated.parallel([
-        Animated.timing(titleOpacity, {
-          toValue: 1,
-          duration: 600,
-          useNativeDriver: true,
-        }),
-        Animated.timing(titleY, {
-          toValue: 0,
-          duration: 600,
-          useNativeDriver: true,
-        }),
+        Animated.timing(titleOpacity, { toValue: 1, duration: 600, useNativeDriver: true }),
+        Animated.timing(titleY, { toValue: 0, duration: 600, useNativeDriver: true }),
       ]),
-      Animated.timing(subtitleOpacity, {
-        toValue: 1,
-        duration: 500,
-        useNativeDriver: true,
-      }),
-      Animated.timing(listOpacity, {
-        toValue: 1,
-        duration: 500,
-        useNativeDriver: true,
-      }),
-      Animated.timing(buttonOpacity, {
-        toValue: 1,
-        duration: 500,
-        useNativeDriver: true,
-      }),
+      Animated.timing(subtitleOpacity, { toValue: 1, duration: 500, useNativeDriver: true }),
+      Animated.timing(listOpacity, { toValue: 1, duration: 500, useNativeDriver: true }),
+      Animated.timing(buttonOpacity, { toValue: 1, duration: 500, useNativeDriver: true }),
     ]).start();
   }, []);
+
+  const handleSelect = (id) => {
+    setSelected((prev) =>
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
+    );
+  };
 
   return (
     <View style={styles.gradient}>
@@ -86,43 +73,34 @@ export default function Landing6() {
         >
           <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
             <View style={styles.innerContainer}>
+
               {/* ── Content ── */}
               <View style={styles.content}>
+
                 {/* Title */}
                 <Animated.Text
-                  style={[
-                    styles.title,
-                    {
-                      opacity: titleOpacity,
-                      transform: [{ translateY: titleY }],
-                    },
-                  ]}
+                  style={[styles.title, { opacity: titleOpacity, transform: [{ translateY: titleY }] }]}
                 >
-                  Medical Checkups
+                  Favorite Comfort Food
                 </Animated.Text>
 
                 {/* Subtitle */}
-                <Animated.Text
-                  style={[styles.subtitle, { opacity: subtitleOpacity }]}
-                >
-                  Do you see a doctor or OB-GYN regularly for your period
-                  health?
+                <Animated.Text style={[styles.subtitle, { opacity: subtitleOpacity }]}>
+                  What is your go-to snack during your period?
                 </Animated.Text>
 
                 {/* Options */}
-                <Animated.View
-                  style={[styles.listContainer, { opacity: listOpacity }]}
-                >
-                  {OPTIONS.map((option) => {
-                    const isSelected = selected === option.id;
+                <Animated.View style={[styles.listContainer, { opacity: listOpacity }]}>
+                  {FOODS.map((food) => {
+                    const isSelected = selected.includes(food.id);
                     return (
                       <TouchableOpacity
-                        key={option.id}
+                        key={food.id}
                         style={[
                           styles.optionRow,
                           isSelected && styles.optionRowSelected,
                         ]}
-                        onPress={() => setSelected(option.id)}
+                        onPress={() => handleSelect(food.id)}
                         activeOpacity={0.8}
                       >
                         <View
@@ -139,7 +117,7 @@ export default function Landing6() {
                             isSelected && styles.optionLabelSelected,
                           ]}
                         >
-                          {option.label}
+                          {food.label}
                         </Text>
                       </TouchableOpacity>
                     );
@@ -148,16 +126,14 @@ export default function Landing6() {
               </View>
 
               {/* ── Next Button ── */}
-              <Animated.View
-                style={[styles.buttonContainer, { opacity: buttonOpacity }]}
-              >
+              <Animated.View style={[styles.buttonContainer, { opacity: buttonOpacity }]}>
                 <TouchableOpacity
-                  style={[styles.button, !selected && styles.buttonDisabled]}
+                  style={[styles.button, selected.length === 0 && styles.buttonDisabled]}
                   onPress={() => {
-                    if (selected) {
+                    if (selected.length > 0) {
                       router.push({
-                        pathname: "/landing7",
-                        params: { ...params, medicalCheckups: selected },
+                        pathname: "/landing14",
+                        params: { ...params, comfortFood: selected.join(",") },
                       });
                     }
                   }}
@@ -166,6 +142,7 @@ export default function Landing6() {
                   <Text style={styles.buttonText}>Next</Text>
                 </TouchableOpacity>
               </Animated.View>
+
             </View>
           </TouchableWithoutFeedback>
         </ScrollView>
@@ -193,19 +170,22 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: Platform.OS === "ios" ? "Georgia" : "serif",
-    fontSize: 28,
+    fontSize: 27,
     lineHeight: 44,
     fontWeight: "700",
     color: "#FFFFFF",
-    marginBottom: 10,
+    textAlign: "center",
+    marginBottom: 12,
   },
   subtitle: {
     fontFamily: Platform.OS === "ios" ? "Courier New" : "monospace",
     fontSize: 15,
-    lineHeight: 22,
-    letterSpacing: 0.8,
+    lineHeight: 20,
+    letterSpacing: 0.7,
     color: "#E1F2FF",
-    marginBottom: 24,
+    textAlign: "center",
+    marginBottom: 28,
+    paddingHorizontal: 10,
   },
   listContainer: {
     width: "100%",
@@ -216,7 +196,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "#FFFFFF",
     borderRadius: 18,
-    height: 55, // Increased height to match Landing 5
+    height: 55,
     paddingHorizontal: 14,
     borderWidth: 2,
     borderColor: "transparent",
@@ -249,7 +229,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "300",
     color: "#001242",
-    textAlign: "left", // Left-aligned text
+    textAlign: "left",
   },
   optionLabelSelected: {
     fontWeight: "600",

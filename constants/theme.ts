@@ -1,30 +1,46 @@
 /**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
+ * Abyssal Flow - Ocean themed colors
  */
 
 import { Platform } from 'react-native';
 
-const tintColorLight = '#0a7ea4';
-const tintColorDark = '#fff';
+// Ocean theme colors
+const oceanDeepBlue = '#0B1F3C';
+const oceanCyan = '#5BA3D0';
+const oceanLight = '#A8D8EA';
+const oceanAccent = '#2C5282';
 
 export const Colors = {
   light: {
-    text: '#11181C',
-    background: '#fff',
-    tint: tintColorLight,
-    icon: '#687076',
-    tabIconDefault: '#687076',
-    tabIconSelected: tintColorLight,
+    text: '#FFFFFF',
+    background: '#0B1F3C',
+    tint: '#5BA3D0',
+    icon: '#A8D8EA',
+    tabIconDefault: '#A8D8EA',
+    tabIconSelected: '#5BA3D0',
   },
   dark: {
-    text: '#ECEDEE',
-    background: '#151718',
-    tint: tintColorDark,
-    icon: '#9BA1A6',
-    tabIconDefault: '#9BA1A6',
-    tabIconSelected: tintColorDark,
+    text: '#FFFFFF',
+    background: '#0B1F3C',
+    tint: '#5BA3D0',
+    icon: '#A8D8EA',
+    tabIconDefault: '#A8D8EA',
+    tabIconSelected: '#5BA3D0',
   },
+};
+
+// Ocean theme specific colors
+export const OceanColors = {
+  deepBlue: oceanDeepBlue,
+  cyan: oceanCyan,
+  light: oceanLight,
+  accent: oceanAccent,
+  white: '#FFFFFF',
+  inputBg: '#FFFFFF',
+  inputText: '#333333',
+  buttonBg: '#0B0F2C',
+  buttonText: '#FFFFFF',
+  textSecondary: '#A8D8EA',
 };
 
 export const Fonts = Platform.select({

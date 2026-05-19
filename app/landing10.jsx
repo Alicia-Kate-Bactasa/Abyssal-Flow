@@ -8,8 +8,8 @@ import {
   Dimensions,
   Animated,
   StatusBar,
-  KeyboardAvoidingView,
   Platform,
+  KeyboardAvoidingView,
   ScrollView,
   TouchableWithoutFeedback,
   Keyboard,
@@ -19,12 +19,12 @@ import WaveBackground from "@/components/WaveBackground";
 const { height } = Dimensions.get("window");
 
 const OPTIONS = [
-  { id: "yes", label: "Yes, regularly" },
-  { id: "sometimes", label: "Only when there is an issue" },
-  { id: "no", label: "No, not recently" },
+  { id: "light", label: "Light (Spotting or minimal)" },
+  { id: "medium", label: "Medium (Steady)" },
+  { id: "heavy", label: "Heavy (Frequent changes needed)" },
 ];
 
-export default function Landing6() {
+export default function Landing10() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const [selected, setSelected] = useState(null);
@@ -38,32 +38,12 @@ export default function Landing6() {
   useEffect(() => {
     Animated.stagger(150, [
       Animated.parallel([
-        Animated.timing(titleOpacity, {
-          toValue: 1,
-          duration: 600,
-          useNativeDriver: true,
-        }),
-        Animated.timing(titleY, {
-          toValue: 0,
-          duration: 600,
-          useNativeDriver: true,
-        }),
+        Animated.timing(titleOpacity, { toValue: 1, duration: 600, useNativeDriver: true }),
+        Animated.timing(titleY, { toValue: 0, duration: 600, useNativeDriver: true }),
       ]),
-      Animated.timing(subtitleOpacity, {
-        toValue: 1,
-        duration: 500,
-        useNativeDriver: true,
-      }),
-      Animated.timing(listOpacity, {
-        toValue: 1,
-        duration: 500,
-        useNativeDriver: true,
-      }),
-      Animated.timing(buttonOpacity, {
-        toValue: 1,
-        duration: 500,
-        useNativeDriver: true,
-      }),
+      Animated.timing(subtitleOpacity, { toValue: 1, duration: 500, useNativeDriver: true }),
+      Animated.timing(listOpacity, { toValue: 1, duration: 500, useNativeDriver: true }),
+      Animated.timing(buttonOpacity, { toValue: 1, duration: 500, useNativeDriver: true }),
     ]).start();
   }, []);
 
@@ -86,33 +66,24 @@ export default function Landing6() {
         >
           <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
             <View style={styles.innerContainer}>
+
               {/* ── Content ── */}
               <View style={styles.content}>
+
                 {/* Title */}
                 <Animated.Text
-                  style={[
-                    styles.title,
-                    {
-                      opacity: titleOpacity,
-                      transform: [{ translateY: titleY }],
-                    },
-                  ]}
+                  style={[styles.title, { opacity: titleOpacity, transform: [{ translateY: titleY }] }]}
                 >
-                  Medical Checkups
+                  Typical Flow
                 </Animated.Text>
 
                 {/* Subtitle */}
-                <Animated.Text
-                  style={[styles.subtitle, { opacity: subtitleOpacity }]}
-                >
-                  Do you see a doctor or OB-GYN regularly for your period
-                  health?
+                <Animated.Text style={[styles.subtitle, { opacity: subtitleOpacity }]}>
+                  How would you describe your heaviest days?
                 </Animated.Text>
 
                 {/* Options */}
-                <Animated.View
-                  style={[styles.listContainer, { opacity: listOpacity }]}
-                >
+                <Animated.View style={[styles.listContainer, { opacity: listOpacity }]}>
                   {OPTIONS.map((option) => {
                     const isSelected = selected === option.id;
                     return (
@@ -148,16 +119,14 @@ export default function Landing6() {
               </View>
 
               {/* ── Next Button ── */}
-              <Animated.View
-                style={[styles.buttonContainer, { opacity: buttonOpacity }]}
-              >
+              <Animated.View style={[styles.buttonContainer, { opacity: buttonOpacity }]}>
                 <TouchableOpacity
                   style={[styles.button, !selected && styles.buttonDisabled]}
                   onPress={() => {
                     if (selected) {
                       router.push({
-                        pathname: "/landing7",
-                        params: { ...params, medicalCheckups: selected },
+                        pathname: "/landing11",
+                        params: { ...params, typicalFlow: selected },
                       });
                     }
                   }}
@@ -166,6 +135,7 @@ export default function Landing6() {
                   <Text style={styles.buttonText}>Next</Text>
                 </TouchableOpacity>
               </Animated.View>
+
             </View>
           </TouchableWithoutFeedback>
         </ScrollView>
@@ -193,19 +163,22 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: Platform.OS === "ios" ? "Georgia" : "serif",
-    fontSize: 28,
+    fontSize: 27,
     lineHeight: 44,
     fontWeight: "700",
     color: "#FFFFFF",
-    marginBottom: 10,
+    textAlign: "center",
+    marginBottom: 12,
   },
   subtitle: {
     fontFamily: Platform.OS === "ios" ? "Courier New" : "monospace",
     fontSize: 15,
-    lineHeight: 22,
-    letterSpacing: 0.8,
+    lineHeight: 20,
+    letterSpacing: 0.7,
     color: "#E1F2FF",
-    marginBottom: 24,
+    textAlign: "center",
+    marginBottom: 28,
+    paddingHorizontal: 10,
   },
   listContainer: {
     width: "100%",
@@ -216,7 +189,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "#FFFFFF",
     borderRadius: 18,
-    height: 55, // Increased height to match Landing 5
+    height: 55,
     paddingHorizontal: 14,
     borderWidth: 2,
     borderColor: "transparent",
@@ -249,7 +222,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "300",
     color: "#001242",
-    textAlign: "left", // Left-aligned text
+    textAlign: "left",
   },
   optionLabelSelected: {
     fontWeight: "600",
