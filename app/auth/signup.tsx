@@ -3,15 +3,15 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
-    Dimensions,
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Dimensions,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 const { width, height } = Dimensions.get('window');
@@ -90,7 +90,7 @@ export default function SignupScreen() {
             />
           </View>
 
-          {/* Email Input */}
+          {}
           <View style={styles.inputContainer}>
             <MaterialIcons name="mail-outline" size={20} color={OceanColors.inputText} style={styles.inputIcon} />
             <TextInput
@@ -105,7 +105,7 @@ export default function SignupScreen() {
             />
           </View>
 
-          {/* Password Input */}
+          {}
           <View style={styles.inputContainer}>
             <MaterialIcons name="lock-outline" size={20} color={OceanColors.inputText} style={styles.inputIcon} />
             <TextInput

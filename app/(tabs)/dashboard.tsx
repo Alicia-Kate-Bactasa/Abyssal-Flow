@@ -1,35 +1,147 @@
-import React, { useRef, useEffect, useCallback, useState } from "react";
-import {
-  View,
-  StyleSheet,
-  Animated,
-  PanResponder,
-  Text,
-  Dimensions,
-} from "react-native";
 import * as Haptics from "expo-haptics";
-import AbyssalBackground from "../../components/AbyssalBackground";
+import { LinearGradient } from "expo-linear-gradient";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import {
+  Animated,
+  Dimensions,
+  Easing,
+  PanResponder,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import Svg, { Path } from "react-native-svg";
 
 const { width, height } = Dimensions.get("window");
 
-const MOON_SIZE = width * 0.85;
+const CYCLE_LENGTH = 28;
+
+const MOON_SIZE = width * 0.74;
 const WRAPPER_SIZE = width * 1.6;
 const DAY_CIRCLE_RADIUS = MOON_SIZE / 2 + 25;
+const INDICATOR_SIZE = 30;
+const INDICATOR_OFFSET = 8;
+const MOON_INSET = 8;
 
-// The exact center coordinates of your moon dial on the screen
+
 const DIAL_CENTER_X = width / 2;
 const DIAL_CENTER_Y = height * 0.28 + WRAPPER_SIZE / 2;
-
 const DECAY_DECELERATION = 0.9965;
 const WEEKDAYS = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
+
+type PhaseKey = "menstrual" | "follicular" | "ovulation" | "luteal";
+
+type PhaseConfig = {
+  key: PhaseKey;
+  gradientColors: [string, string];
+  gradientLocations: [number, number];
+  subGreeting: string;
+  title: string;
+  description: string;
+  moonColor: string;
+  waveColors: [string, string];
+  wavePath: string;
+};
+
+const getCycleDay = (day: number) => ((day - 1) % CYCLE_LENGTH) + 1;
+
+const getPhaseKey = (cycleDay: number): PhaseKey => {
+  if (cycleDay <= 5) return "menstrual";
+  if (cycleDay <= 13) return "follicular";
+  if (cycleDay <= 17) return "ovulation";
+  return "luteal";
+};
+
+const PHASES: Record<PhaseKey, PhaseConfig> = {
+  menstrual: {
+    key: "menstrual",
+    gradientColors: ["#001047", "#01001D"],
+    gradientLocations: [0, 1],
+    subGreeting: "you're on your period",
+    title: "Current Phase: Menstrual",
+    description:
+      "The ocean turns stormy and deep. Your body is shedding and resetting with quiet intensity. Rest and go gently.",
+    moonColor: "#FFFFFF",
+    waveColors: ["#001958", "#001047"],
+    wavePath: `
+      M 0, 110
+      C ${width * 0.18}, 30 ${width * 0.36}, 210 ${width * 0.55}, 120
+      C ${width * 0.7}, 40 ${width * 0.86}, 200 ${width}, 110
+      L ${width}, 180
+      L 0, 180
+      Z
+    `,
+  },
+  follicular: {
+    key: "follicular",
+    gradientColors: ["#FF5A79", "#FFB129"],
+    gradientLocations: [0.25, 0.92],
+    subGreeting: "your period is in [X] days",
+    title: "Current Phase: Follicular",
+    description:
+      "Warm light returns to the water as your energy gently rebuilds. A quiet sense of renewal begins to rise.",
+    moonColor: "#FFD768",
+    waveColors: ["#FFB86A", "#FF8A7C"],
+    wavePath: `
+      M 0, 132
+      C ${width * 0.2}, 124 ${width * 0.35}, 140 ${width * 0.5}, 130
+      C ${width * 0.65}, 120 ${width * 0.8}, 138 ${width}, 132
+      L ${width}, 180
+      L 0, 180
+      Z
+    `,
+  },
+  ovulation: {
+    key: "ovulation",
+    gradientColors: ["#9EE8FF", "#00B2FF"],
+    gradientLocations: [0.06, 0.78],
+    subGreeting: "your period is in [X] days",
+    title: "Current Phase: Ovulation",
+    description:
+      "The ocean is bright and open under full light. Energy peaks and everything feels more alive and connected. Step into your energy.",
+    moonColor: "#FFE79A",
+    waveColors: ["#6CC4FF", "#49A9E6"],
+    wavePath: `
+      M 0, 134
+      C ${width * 0.25}, 126 ${width * 0.4}, 140 ${width * 0.55}, 132
+      C ${width * 0.7}, 124 ${width * 0.85}, 138 ${width}, 134
+      L ${width}, 180
+      L 0, 180
+      Z
+    `,
+  },
+  luteal: {
+    key: "luteal",
+    gradientColors: ["#2C77B8", "#003457"],
+    gradientLocations: [0.1, 0.78],
+    subGreeting: "your period is in [X] days",
+    title: "Current Phase: Luteal",
+    description:
+      "The ocean deepens under fading light. Your energy slows as your body prepares to reset. Take things gently today.",
+    moonColor: "#FFFFFF",
+    waveColors: ["#1E5E8F", "#0B3B5E"],
+    wavePath: `
+      M 0, 120
+      C ${width * 0.22}, 80 ${width * 0.5}, 170 ${width * 0.74}, 120
+      C ${width * 0.86}, 95 ${width * 0.94}, 140 ${width}, 120
+      L ${width}, 180
+      L 0, 180
+      Z
+    `,
+  },
+};
 
 // ==========================================
 // 1. THE MINI-COMPONENT (Infinite Momentum Dial)
 // ==========================================
 const CircularCalendarDial = ({
   onDayChange,
+  onDateChange,
+  phase,
 }: {
   onDayChange: (day: number) => void;
+  onDateChange: (date: Date) => void;
+  phase: PhaseConfig;
 }) => {
   const [viewDate, setViewDate] = useState(new Date());
 
@@ -52,11 +164,15 @@ const CircularCalendarDial = ({
   ).current;
   const currentAngleRef = useRef(initialRotationAngle);
 
-  // NEW: Tracks the exact radian angle of your finger on the previous frame
+  
   const previousAngleRef = useRef(0);
 
   const inactivityTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastTickRef = useRef(Math.round(initialRotationAngle / angleSlice));
+
+  useEffect(() => {
+    onDateChange(viewDate);
+  }, [onDateChange, viewDate]);
 
   useEffect(() => {
     const id = rotationAngle.addListener(({ value }) => {
@@ -69,40 +185,20 @@ const CircularCalendarDial = ({
         const liveDay = tick + 1;
         if (liveDay >= 1 && liveDay <= daysInMonth) {
           onDayChange(liveDay);
+          onDateChange(new Date(currentYear, currentMonth, liveDay));
         }
       }
     });
     return () => rotationAngle.removeListener(id);
-  }, [angleSlice, daysInMonth, onDayChange, rotationAngle]);
-
-  const snapToNearest = useCallback(
-    (fromVelocityDegPerMs = 0) => {
-      const raw = currentAngleRef.current;
-      const snapped = Math.round(raw / angleSlice) * angleSlice;
-
-      Animated.spring(rotationAngle, {
-        toValue: snapped,
-        velocity: fromVelocityDegPerMs,
-        useNativeDriver: true,
-        tension: 60,
-        friction: 10,
-      }).start(({ finished }) => {
-        if (finished) {
-          const landedIndex = Math.round(-snapped / angleSlice);
-          if (landedIndex >= daysInMonth) {
-            setViewDate(new Date(currentYear, currentMonth + 1, 1));
-            rotationAngle.setValue(0);
-          } else if (landedIndex < 0) {
-            const prevDays = new Date(currentYear, currentMonth, 0).getDate();
-            setViewDate(new Date(currentYear, currentMonth - 1, 1));
-            rotationAngle.setValue(-(prevDays - 1) * (360 / prevDays));
-          }
-          startInactivityTimer();
-        }
-      });
-    },
-    [angleSlice, daysInMonth, currentYear, currentMonth, rotationAngle],
-  );
+  }, [
+    angleSlice,
+    currentMonth,
+    currentYear,
+    daysInMonth,
+    onDateChange,
+    onDayChange,
+    rotationAngle,
+  ]);
 
   const resetToToday = useCallback(() => {
     const today = new Date();
@@ -126,6 +222,47 @@ const CircularCalendarDial = ({
     if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
     inactivityTimer.current = setTimeout(resetToToday, 5000);
   }, [resetToToday]);
+
+  const snapToNearest = useCallback(
+    (fromVelocityDegPerMs = 0) => {
+      const raw = currentAngleRef.current;
+      const snapped = Math.round(raw / angleSlice) * angleSlice;
+
+      Animated.spring(rotationAngle, {
+        toValue: snapped,
+        velocity: fromVelocityDegPerMs,
+        useNativeDriver: true,
+        tension: 60,
+        friction: 10,
+      }).start(({ finished }) => {
+        if (finished) {
+          const landedIndex = Math.round(-snapped / angleSlice);
+          if (landedIndex >= daysInMonth) {
+            const nextDate = new Date(currentYear, currentMonth + 1, 1);
+            setViewDate(nextDate);
+            onDateChange(nextDate);
+            rotationAngle.setValue(0);
+          } else if (landedIndex < 0) {
+            const prevDays = new Date(currentYear, currentMonth, 0).getDate();
+            const prevDate = new Date(currentYear, currentMonth - 1, 1);
+            setViewDate(prevDate);
+            onDateChange(prevDate);
+            rotationAngle.setValue(-(prevDays - 1) * (360 / prevDays));
+          }
+          startInactivityTimer();
+        }
+      });
+    },
+    [
+      angleSlice,
+      currentMonth,
+      currentYear,
+      daysInMonth,
+      onDateChange,
+      rotationAngle,
+      startInactivityTimer,
+    ],
+  );
 
   useEffect(() => {
     startInactivityTimer();
@@ -156,24 +293,24 @@ const CircularCalendarDial = ({
       },
 
       onPanResponderMove: (_evt, gs) => {
-        // Calculate the new angle on this frame
+       
         const rx = gs.moveX - DIAL_CENTER_X;
         const ry = gs.moveY - DIAL_CENTER_Y;
         const currentAngle = Math.atan2(ry, rx);
 
-        // Find out how many radians the finger moved
+    
         let deltaAngle = currentAngle - previousAngleRef.current;
 
-        // Fix the math wrap-around (when crossing the left side of the circle)
+     
         if (deltaAngle > Math.PI) deltaAngle -= 2 * Math.PI;
         if (deltaAngle < -Math.PI) deltaAngle += 2 * Math.PI;
 
-        // Convert radians to degrees and add it to our wheel!
+    
         const deltaDeg = deltaAngle * (180 / Math.PI);
         currentAngleRef.current += deltaDeg;
         rotationAngle.setValue(currentAngleRef.current);
 
-        // Save this angle for the next frame
+   
         previousAngleRef.current = currentAngle;
       },
 
@@ -251,14 +388,46 @@ const CircularCalendarDial = ({
 
   return (
     <View style={styles.dialContainer}>
+      <View
+        style={[
+          styles.dialIndicator,
+          {
+            width: INDICATOR_SIZE,
+            height: INDICATOR_SIZE,
+            borderRadius: INDICATOR_SIZE / 2,
+            top:
+              WRAPPER_SIZE / 2 -
+              DAY_CIRCLE_RADIUS -
+              INDICATOR_SIZE / 2 +
+              INDICATOR_OFFSET,
+            left: WRAPPER_SIZE / 2 - INDICATOR_SIZE / 2,
+          },
+        ]}
+        pointerEvents="none"
+      />
+      <View
+        style={[
+          styles.moonGlowCore,
+          {
+            backgroundColor: phase.moonColor,
+            top: (WRAPPER_SIZE - MOON_SIZE) / 2 + MOON_INSET,
+            left: (WRAPPER_SIZE - MOON_SIZE) / 2,
+          },
+        ]}
+        pointerEvents="none"
+      />
       <Animated.View
         style={[
           styles.calendarMoonWrapper,
-          { transform: [{ rotate: rotateInterpolate }] },
+          {
+            width: WRAPPER_SIZE,
+            height: WRAPPER_SIZE,
+            borderRadius: WRAPPER_SIZE / 2,
+            transform: [{ rotate: rotateInterpolate }],
+          },
         ]}
         {...panResponder.panHandlers}
       >
-        <View style={styles.moonGlowCore} pointerEvents="none" />
         {generateDayElements()}
       </Animated.View>
     </View>
@@ -270,26 +439,141 @@ const CircularCalendarDial = ({
 // ==========================================
 export default function Dashboard() {
   const [activeDay, setActiveDay] = useState(new Date().getDate());
-  const [footerDate] = useState(new Date());
+  const [footerDate, setFooterDate] = useState(new Date());
+  const cycleDay = getCycleDay(activeDay);
+  const phaseKey = getPhaseKey(cycleDay);
+  const phase = PHASES[phaseKey];
+  const daysUntilPeriod = CYCLE_LENGTH - cycleDay + 1;
+
+  const [previousPhaseKey, setPreviousPhaseKey] = useState<PhaseKey>(phaseKey);
+  const fadeAnim = useRef(new Animated.Value(1)).current;
+  const waveFadeAnim = useRef(new Animated.Value(1)).current;
+  const waveMorphAnim = useRef(new Animated.Value(1)).current;
+  const [waveTransitioning, setWaveTransitioning] = useState(false);
+
+  useEffect(() => {
+    if (phaseKey !== previousPhaseKey) {
+      fadeAnim.setValue(0);
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 400,
+        useNativeDriver: true,
+      }).start(() => {
+        setPreviousPhaseKey(phaseKey);
+      });
+      setWaveTransitioning(true);
+      waveFadeAnim.setValue(0);
+      Animated.timing(waveFadeAnim, {
+        toValue: 1,
+        duration: 650,
+        easing: Easing.inOut(Easing.cubic),
+        useNativeDriver: true,
+      }).start(({ finished }) => {
+        if (finished) setWaveTransitioning(false);
+      });
+
+      waveMorphAnim.setValue(0);
+      Animated.timing(waveMorphAnim, {
+        toValue: 1,
+        duration: 650,
+        easing: Easing.inOut(Easing.cubic),
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [
+    fadeAnim,
+    phaseKey,
+    previousPhaseKey,
+    waveFadeAnim,
+    waveMorphAnim,
+  ]);
+
+  const previousPhase = PHASES[previousPhaseKey];
+  const subGreetingText =
+    phase.key === "menstrual"
+      ? phase.subGreeting
+      : phase.subGreeting.replace("[X]", String(daysUntilPeriod));
 
   return (
-    <AbyssalBackground
-      middleLayer={
-        <View style={styles.moonWrapper}>
-          <CircularCalendarDial onDayChange={setActiveDay} />
-        </View>
-      }
-    >
+    <View style={styles.screen}>
+      <LinearGradient
+        colors={previousPhase.gradientColors}
+        locations={previousPhase.gradientLocations}
+        style={StyleSheet.absoluteFill}
+      />
+      <Animated.View style={[StyleSheet.absoluteFill, { opacity: fadeAnim }]}>
+        <LinearGradient
+          colors={phase.gradientColors}
+          locations={phase.gradientLocations}
+          style={StyleSheet.absoluteFill}
+        />
+      </Animated.View>
+
+      <View style={styles.moonWrapper}>
+        <CircularCalendarDial
+          onDayChange={setActiveDay}
+          onDateChange={setFooterDate}
+          phase={phase}
+        />
+      </View>
+
+      <View style={styles.waveLayer} pointerEvents="none">
+        {waveTransitioning ? (
+          <Animated.View
+            style={{
+              opacity: waveFadeAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [1, 0],
+              }),
+              transform: [
+                {
+                  translateX: waveMorphAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [-4, 0],
+                  }),
+                },
+              ],
+            }}
+          >
+            <Svg width={width} height={180} viewBox={`0 0 ${width} 180`}>
+              <Path
+                d={previousPhase.wavePath}
+                fill={previousPhase.waveColors[0]}
+              />
+            </Svg>
+            <LinearGradient colors={previousPhase.waveColors} style={styles.waveFill} />
+          </Animated.View>
+        ) : null}
+        <Animated.View
+          style={[
+            styles.waveOverlay,
+            {
+              transform: [
+                {
+                  translateX: waveMorphAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [-4, 0],
+                  }),
+                },
+              ],
+              opacity: waveFadeAnim,
+            },
+          ]}
+        >
+          <Svg width={width} height={180} viewBox={`0 0 ${width} 180`}>
+            <Path d={phase.wavePath} fill={phase.waveColors[0]} />
+          </Svg>
+          <LinearGradient colors={phase.waveColors} style={styles.waveFill} />
+        </Animated.View>
+      </View>
+
       <View style={styles.contentOverlay} pointerEvents="box-none">
         <View style={styles.header} pointerEvents="box-none">
           <Text style={styles.greeting}>Hello, ishie!</Text>
-          <Text style={styles.subGreeting}>your period is in 4 days</Text>
+          <Text style={styles.subGreeting}>{subGreetingText}</Text>
           <View style={styles.divider} />
-          <Text style={styles.phaseTitle}>Current Phase: Luteal</Text>
-          <Text style={styles.phaseDescription}>
-            The ocean deepens under fading light. Your energy slows as your body
-            prepares to reset. Take things gently today.
-          </Text>
+          <Text style={styles.phaseTitle}>{phase.title}</Text>
+          <Text style={styles.phaseDescription}>{phase.description}</Text>
         </View>
 
         <View style={styles.bottomInfo} pointerEvents="none">
@@ -302,7 +586,7 @@ export default function Dashboard() {
           </Text>
         </View>
       </View>
-    </AbyssalBackground>
+    </View>
   );
 }
 
@@ -310,6 +594,24 @@ export default function Dashboard() {
 // 3. STYLES (Untouched)
 // ==========================================
 const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: "#01001D",
+  },
+  waveLayer: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: height * 0.48,
+    zIndex: 20,
+  },
+  waveFill: {
+    height: height * 0.38,
+    marginTop: -2,
+  },
+  waveOverlay: {
+    ...StyleSheet.absoluteFillObject,
+  },
   moonWrapper: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: "center",
@@ -360,11 +662,23 @@ const styles = StyleSheet.create({
   },
   dialContainer: {
     position: "absolute",
-    top: height * 0.28,
+    top: height * 0.23,
     width: WRAPPER_SIZE,
     height: WRAPPER_SIZE,
     alignItems: "center",
     justifyContent: "center",
+  },
+  dialIndicator: {
+    position: "absolute",
+    width: INDICATOR_SIZE,
+    height: INDICATOR_SIZE,
+    borderRadius: INDICATOR_SIZE / 2,
+    borderWidth: 2,
+    borderColor: "rgba(255,255,255,0.4)",
+    backgroundColor: "transparent",
+    top:
+      WRAPPER_SIZE / 2 - DAY_CIRCLE_RADIUS - INDICATOR_SIZE / 2 + INDICATOR_OFFSET,
+    left: WRAPPER_SIZE / 2 - INDICATOR_SIZE / 2,
   },
   calendarMoonWrapper: {
     width: WRAPPER_SIZE,
@@ -413,7 +727,7 @@ const styles = StyleSheet.create({
   },
   bottomInfo: {
     alignItems: "center",
-    marginBottom: 60,
+    marginBottom: 30,
   },
   bigDayText: {
     fontFamily: "Georgia",
@@ -432,7 +746,7 @@ const styles = StyleSheet.create({
     fontFamily: "monospace",
     fontSize: 12,
     color: "white",
-    marginTop: 30,
+    marginTop: 40,
     letterSpacing: 3,
     opacity: 0.7,
   },
