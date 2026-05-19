@@ -28,7 +28,7 @@ const C = {
 };
 
 // ─── Layout Constants ─────────────────────────────────────────────────────────
-const TAB_BAR_HEIGHT = 70;
+const TAB_BAR_HEIGHT = 60;
 const TAB_BAR_BOTTOM = 16;
 const CARET = 12;
 
@@ -466,15 +466,15 @@ export default function TabLayout() {
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
-const ADD_SIZE = 52;
+const ADD_SIZE = 46;
 const GLOW_SIZE = ADD_SIZE + 16;
 
 const styles = StyleSheet.create({
   tabBar: {
     position: "absolute",
     bottom: TAB_BAR_BOTTOM,
-    left: 20,
-    right: 20,
+    left: 25,
+    right: 25,
     height: TAB_BAR_HEIGHT,
     backgroundColor: C.bar,
     borderRadius: 40,
@@ -489,9 +489,9 @@ const styles = StyleSheet.create({
     elevation: 12,
   },
   iconWrap: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",
     transform: [{ translateY: 12 }],
