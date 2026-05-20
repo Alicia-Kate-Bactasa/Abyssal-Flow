@@ -16,7 +16,10 @@ export default function AuthLayout() {
           name="signup"
           options={{
             headerShown: false,
-            animation: "default",
+            animation: "slide_from_right",
+            gestureEnabled: true,
+            fullScreenGestureEnabled: true,
+            animationMatchesGesture: true,
           }}
         />
       </Stack>

@@ -1,17 +1,18 @@
-import { OceanColors } from '@/constants/theme';
-import { MaterialIcons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
+import WaveBackground from "@/components/WaveBackground";
+import { OceanColors } from "@/constants/theme";
+import { MaterialIcons } from "@expo/vector-icons";
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 
 export default function LoginScreen() {
@@ -40,24 +41,21 @@ export default function LoginScreen() {
   };
 
   return (
-    <LinearGradient
-      colors={['#041539', '#26466D']}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 0, y: 1 }}
-      style={styles.gradient}
-    >
-      <View style={styles.blurOverlay} pointerEvents="none" />
+    <View style={styles.container}>
+      <WaveBackground />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.container}
+        style={styles.keyboardContainer}
       >
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           <View style={styles.content}>
           {/* Logo/Brand Section */}
           <View style={styles.logoSection}>
-            <View style={styles.logo}>
-              <MaterialIcons name="water-drop" size={40} color={OceanColors.cyan} />
-            </View>
+            <Image
+              source={require("@/assets/images/abyssal-logo.png")}
+              style={styles.logoImage}
+              resizeMode="contain"
+            />
             <Text style={styles.brandName}>Abyssal Flow</Text>
           </View>
 
@@ -66,11 +64,11 @@ export default function LoginScreen() {
 
           {/* Email Input */}
           <View style={styles.inputContainer}>
-            <MaterialIcons name="mail-outline" size={20} color={OceanColors.inputText} style={styles.inputIcon} />
+            <MaterialIcons name="mail-outline" size={20} color={OceanColors.white} style={styles.inputIcon} />
             <TextInput
               style={styles.input}
               placeholder="Email"
-              placeholderTextColor="#999"
+              placeholderTextColor="rgba(255,255,255,0.6)"
               value={email}
               onChangeText={setEmail}
               keyboardType="email-address"
@@ -81,32 +79,33 @@ export default function LoginScreen() {
 
           {/* Password Input */}
           <View style={styles.inputContainer}>
-            <MaterialIcons name="lock-outline" size={20} color={OceanColors.inputText} style={styles.inputIcon} />
+            <MaterialIcons name="lock-outline" size={20} color={OceanColors.white} style={styles.inputIcon} />
             <TextInput
               style={styles.input}
               placeholder="Password"
-              placeholderTextColor="#999"
+              placeholderTextColor="rgba(255,255,255,0.6)"
               value={password}
               onChangeText={setPassword}
               secureTextEntry={!showPassword}
               editable={!loading}
             />
-            <TouchableOpacity onPress={() => setShowPassword(!showPassword)} disabled={!password}>
+            <TouchableOpacity activeOpacity={1} onPress={() => setShowPassword(!showPassword)} disabled={!password}>
               <MaterialIcons
                 name={showPassword ? 'visibility' : 'visibility-off'}
                 size={20}
-                color={OceanColors.inputText}
+                color={OceanColors.white}
               />
             </TouchableOpacity>
           </View>
 
           {/* Forgot Password Link */}
-          <TouchableOpacity style={styles.forgotPasswordContainer}>
+          <TouchableOpacity activeOpacity={1} style={styles.forgotPasswordContainer}>
             <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
           </TouchableOpacity>
 
           {/* Login Button */}
           <TouchableOpacity
+            activeOpacity={1}
             style={[styles.loginButton, loading && styles.buttonDisabled]}
             onPress={handleLogin}
             disabled={loading}
@@ -117,62 +116,71 @@ export default function LoginScreen() {
           {/* Sign Up Link */}
           <View style={styles.signupContainer}>
             <Text style={styles.signupText}>New to the depths? </Text>
-            <TouchableOpacity onPress={handleSignupNavigation}>
+            <TouchableOpacity activeOpacity={1} onPress={handleSignupNavigation}>
               <Text style={styles.signupLink}>Start Your Journey.</Text>
             </TouchableOpacity>
           </View>
         </View>
         </ScrollView>
       </KeyboardAvoidingView>
-    </LinearGradient>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  gradient: {
+  container: {
     flex: 1,
   },
-  blurOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(4, 21, 57, 0.18)',
-  },
-  container: {
+  keyboardContainer: {
     flex: 1,
   },
   scrollContent: {
     flexGrow: 1,
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
+    paddingTop: 28,
   },
   content: {
     paddingHorizontal: 24,
-    paddingVertical: 40,
+    paddingVertical: 24,
     zIndex: 1,
   },
   logoSection: {
     alignItems: 'center',
-    marginBottom: 40,
+    justifyContent: 'flex-start',
+    width: '100%',
+    height: 194,
+    marginBottom: 8,
+    position: 'relative',
   },
-  logo: {
-    marginBottom: 12,
+  logoImage: {
+    width: 185,
+    height: 185,
+    position: 'absolute',
+    top: 0,
   },
   brandName: {
     fontSize: 18,
-    fontWeight: '600',
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
     color: OceanColors.textSecondary,
     letterSpacing: 1,
+    position: 'absolute',
+    top: 181,
   },
   heading: {
     fontSize: 32,
-    fontWeight: '700',
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
     color: OceanColors.white,
     marginBottom: 32,
     textAlign: 'center',
+    fontWeight: '700',
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: OceanColors.inputBg,
-    borderRadius: 12,
+    backgroundColor: 'transparent',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(181,230,255,0.45)',
     paddingHorizontal: 16,
     marginBottom: 16,
     height: 50,
@@ -183,7 +191,8 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     fontSize: 16,
-    color: OceanColors.inputText,
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+    color: OceanColors.white,
   },
   forgotPasswordContainer: {
     alignItems: 'flex-end',
@@ -192,22 +201,27 @@ const styles = StyleSheet.create({
   forgotPasswordText: {
     color: OceanColors.textSecondary,
     fontSize: 13,
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
     textDecorationLine: 'underline',
   },
   loginButton: {
-    backgroundColor: OceanColors.buttonBg,
-    borderRadius: 12,
+    backgroundColor: 'transparent',
+    borderRadius: 999,
     paddingVertical: 14,
     alignItems: 'center',
+    alignSelf: 'center',
+    width: 180,
     marginBottom: 40,
+    borderWidth: 1,
+    borderColor: 'rgba(181,230,255,0.7)',
   },
   buttonDisabled: {
-    opacity: 0.6,
+    opacity: 0.5,
   },
   loginButtonText: {
-    color: OceanColors.buttonText,
+    color: OceanColors.white,
     fontSize: 16,
-    fontWeight: '700',
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
     letterSpacing: 0.5,
   },
   signupContainer: {
@@ -218,11 +232,12 @@ const styles = StyleSheet.create({
   signupText: {
     color: OceanColors.textSecondary,
     fontSize: 14,
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
   },
   signupLink: {
     color: OceanColors.cyan,
     fontSize: 14,
-    fontWeight: '600',
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
     textDecorationLine: 'underline',
   },
 });

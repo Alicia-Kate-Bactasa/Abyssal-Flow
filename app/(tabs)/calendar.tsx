@@ -1,4 +1,5 @@
 import { formatDateKey, parseDateKey, useCycleData } from "@/hooks/use-cycle-store";
+import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useEffect, useMemo, useState } from "react";
 import {
@@ -7,6 +8,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -14,26 +16,27 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 const { width } = Dimensions.get("window");
 const WEEKDAYS = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
 
-const buildMonthRange = (center: Date, pastMonths: number, futureMonths: number) => {
-  const start = new Date(center.getFullYear(), center.getMonth() - pastMonths, 1);
-  const total = pastMonths + futureMonths + 1;
-  return Array.from({ length: total }, (_, index) => {
-    const date = new Date(start.getFullYear(), start.getMonth() + index, 1);
-    return { year: date.getFullYear(), month: date.getMonth() };
-  });
-};
-
 const buildWeeks = (year: number, month: number) => {
   const firstDay = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const cells: (number | null)[] = [
-    ...Array(firstDay).fill(null),
-    ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
-  ];
+  const prevMonthDays = new Date(year, month, 0).getDate();
 
-  while (cells.length < 42) cells.push(null);
+  const cells = [];
 
-  const weeks: (number | null)[][] = [];
+  for (let i = firstDay - 1; i >= 0; i--) {
+    cells.push({ day: prevMonthDays - i, isCurrentMonth: false, monthOffset: -1 });
+  }
+
+  for (let i = 1; i <= daysInMonth; i++) {
+    cells.push({ day: i, isCurrentMonth: true, monthOffset: 0 });
+  }
+
+  let nextMonthDay = 1;
+  while (cells.length < 42) {
+    cells.push({ day: nextMonthDay++, isCurrentMonth: false, monthOffset: 1 });
+  }
+
+  const weeks = [];
   for (let i = 0; i < 42; i += 7) {
     weeks.push(cells.slice(i, i + 7));
   }
@@ -82,18 +85,18 @@ export default function CalendarScreen() {
     recalcPredictions,
     getCycleStats,
   } = useCycleData();
-  const [activeSegment, setActiveSegment] = useState<"calendar" | "pattern">(
-    "calendar",
-  );
+  
+  const [activeSegment, setActiveSegment] = useState<"calendar" | "pattern">("calendar");
   const [draftDates, setDraftDates] = useState<Record<string, true>>(periodDates);
+  const [currentViewDate, setCurrentViewDate] = useState(new Date());
 
   useEffect(() => {
     setDraftDates(periodDates);
   }, [periodDates]);
 
-  const months = useMemo(() => buildMonthRange(new Date(), 24, 24), []);
   const periodKeys = useMemo(() => Object.keys(periodDates), [periodDates]);
   const draftKeys = useMemo(() => Object.keys(draftDates), [draftDates]);
+  
   const hasChanges = useMemo(() => {
     if (periodKeys.length !== draftKeys.length) return true;
     const lookup = new Set(periodKeys);
@@ -117,8 +120,8 @@ export default function CalendarScreen() {
     });
   }, [periodKeys]);
 
-  const toggleDraftDate = (year: number, month: number, day: number) => {
-    const key = formatDateKey(new Date(year, month, day));
+  const toggleDraftDate = (targetYear: number, targetMonth: number, day: number) => {
+    const key = formatDateKey(new Date(targetYear, targetMonth, day));
     setDraftDates((prev) => {
       const next = { ...prev };
       if (next[key]) {
@@ -135,6 +138,81 @@ export default function CalendarScreen() {
     recalcPredictions();
   };
 
+  const handlePrevMonth = () => {
+    setCurrentViewDate((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
+  };
+
+  const handleNextMonth = () => {
+    setCurrentViewDate((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
+  };
+
+  const renderCalendar = () => {
+    const year = currentViewDate.getFullYear();
+    const month = currentViewDate.getMonth();
+    const monthLabel = formatMonthLabel(year, month);
+    const weeks = buildWeeks(year, month);
+
+    return (
+      <View style={styles.monthPage}>
+        <View style={styles.monthCard}>
+          <View style={styles.monthHeader}>
+            <TouchableOpacity onPress={handlePrevMonth} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+              <Ionicons name="chevron-back" size={20} color="#4EA6FF" />
+            </TouchableOpacity>
+            
+            <Text style={styles.monthTitle}>{monthLabel}</Text>
+            
+            <TouchableOpacity onPress={handleNextMonth} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+              <Ionicons name="chevron-forward" size={20} color="#4EA6FF" />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.weekRow}>
+            {WEEKDAYS.map((label) => (
+              <Text key={label} style={styles.weekday}>
+                {label}
+              </Text>
+            ))}
+          </View>
+          
+          {weeks.map((week, index) => (
+            <View key={index} style={styles.weekRow}>
+              {week.map((cell, cellIndex) => {
+                const targetDate = new Date(year, month + cell.monthOffset, cell.day);
+                const key = formatDateKey(targetDate);
+                const isPeriod = !!draftDates[key];
+                const isPredicted = predictedDates[key] && !isPeriod;
+                
+                return (
+                  <Pressable
+                    key={key}
+                    style={[
+                      styles.dayCell,
+                      isPredicted && styles.predictedDay,
+                      isPeriod && styles.periodDay,
+                    ]}
+                    onPress={() => toggleDraftDate(targetDate.getFullYear(), targetDate.getMonth(), cell.day)}
+                  >
+                    <Text
+                      style={[
+                        styles.dayText,
+                        !cell.isCurrentMonth && styles.outOfMonthText,
+                        isPredicted && styles.predictedDayText,
+                        isPeriod && styles.periodDayText,
+                      ]}
+                    >
+                      {cell.day}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          ))}
+        </View>
+      </View>
+    );
+  };
+
   return (
     <LinearGradient colors={["#04122B", "#1A2E5A"]} style={styles.container}>
       <ScrollView
@@ -148,35 +226,17 @@ export default function CalendarScreen() {
         <View style={styles.segmentedControl}>
           <Pressable
             onPress={() => setActiveSegment("calendar")}
-            style={[
-              styles.segment,
-              activeSegment === "calendar" && styles.segmentActive,
-            ]}
+            style={[styles.segment, activeSegment === "calendar" && styles.segmentActive]}
           >
-            <Text
-              style={
-                activeSegment === "calendar"
-                  ? styles.segmentTextActive
-                  : styles.segmentText
-              }
-            >
+            <Text style={activeSegment === "calendar" ? styles.segmentTextActive : styles.segmentText}>
               Calendar
             </Text>
           </Pressable>
           <Pressable
             onPress={() => setActiveSegment("pattern")}
-            style={[
-              styles.segment,
-              activeSegment === "pattern" && styles.segmentActive,
-            ]}
+            style={[styles.segment, activeSegment === "pattern" && styles.segmentActive]}
           >
-            <Text
-              style={
-                activeSegment === "pattern"
-                  ? styles.segmentTextActive
-                  : styles.segmentText
-              }
-            >
+            <Text style={activeSegment === "pattern" ? styles.segmentTextActive : styles.segmentText}>
               Cycle Pattern
             </Text>
           </Pressable>
@@ -194,69 +254,14 @@ export default function CalendarScreen() {
         </View>
 
         {activeSegment === "calendar" ? (
-          <>
-            {months.map(({ year, month }) => {
-              const monthLabel = formatMonthLabel(year, month);
-              const weeks = buildWeeks(year, month);
-              const predictedKeys = new Set(
-                Object.keys(predictedDates).filter((key) => {
-                  const date = parseDateKey(key);
-                  return date.getFullYear() === year && date.getMonth() === month;
-                }),
-              );
-              return (
-                <View key={`${year}-${month}`} style={styles.monthCard}>
-                  <Text style={styles.monthTitle}>{monthLabel}</Text>
-                  <View style={styles.weekRow}>
-                    {WEEKDAYS.map((label) => (
-                      <Text key={label} style={styles.weekday}>
-                        {label}
-                      </Text>
-                    ))}
-                  </View>
-                  {weeks.map((week, index) => (
-                    <View key={index} style={styles.weekRow}>
-                      {week.map((day, cellIndex) => {
-                        if (!day) {
-                          return <View key={`empty-${cellIndex}`} style={styles.dayCell} />;
-                        }
-                        const key = formatDateKey(new Date(year, month, day));
-                        const isPeriod = !!draftDates[key];
-                        const isPredicted = predictedKeys.has(key) && !isPeriod;
-                        return (
-                          <Pressable
-                            key={key}
-                            style={[
-                              styles.dayCell,
-                              isPredicted && styles.predictedDay,
-                              isPeriod && styles.periodDay,
-                            ]}
-                            onPress={() => toggleDraftDate(year, month, day)}
-                          >
-                            <Text
-                              style={[
-                                styles.dayText,
-                                isPredicted && styles.predictedDayText,
-                                isPeriod && styles.periodDayText,
-                              ]}
-                            >
-                              {day}
-                            </Text>
-                          </Pressable>
-                        );
-                      })}
-                    </View>
-                  ))}
-                </View>
-              );
-            })}
-
+          <View style={styles.calendarWrapper}>
+            {renderCalendar()}
             {hasChanges ? (
               <Pressable style={styles.saveButton} onPress={handleSave}>
                 <Text style={styles.saveButtonText}>Save Changes</Text>
               </Pressable>
             ) : null}
-          </>
+          </View>
         ) : (
           <>
             <Text style={styles.sectionTitle}>Cycle Pattern</Text>
@@ -285,12 +290,13 @@ export default function CalendarScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   content: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 0, 
   },
   headerTitle: {
     color: "#FFFFFF",
     fontSize: 20,
     marginBottom: 12,
+    paddingHorizontal: 20,
   },
   segmentedControl: {
     flexDirection: "row",
@@ -298,6 +304,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     padding: 4,
     marginBottom: 16,
+    marginHorizontal: 20,
   },
   segment: {
     flex: 1,
@@ -315,6 +322,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 14,
     marginBottom: 16,
+    marginHorizontal: 20,
   },
   analyticsRow: {
     flexDirection: "row",
@@ -323,16 +331,30 @@ const styles = StyleSheet.create({
   },
   analyticsLabel: { color: "rgba(255,255,255,0.7)", fontSize: 12 },
   analyticsValue: { color: "#FFFFFF", fontSize: 12 },
+  calendarWrapper: {
+    alignItems: "center",
+  },
+  monthPage: {
+    width: width,
+    paddingHorizontal: 20,
+  },
   monthCard: {
     backgroundColor: "rgba(19,33,75,0.65)",
     borderRadius: 18,
     padding: 14,
     marginBottom: 16,
   },
+  monthHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 14,
+    paddingHorizontal: 10,
+  },
   monthTitle: {
     color: "#FFFFFF",
-    textAlign: "center",
-    marginBottom: 10,
+    fontSize: 16,
+    fontWeight: "bold",
   },
   weekRow: {
     flexDirection: "row",
@@ -347,8 +369,8 @@ const styles = StyleSheet.create({
   },
   dayCell: {
     width: (width - 80) / 7,
-    height: 26,
-    borderRadius: 13,
+    height: 32,
+    borderRadius: 16,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -357,31 +379,36 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(209, 27, 27, 0.45)",
   },
-  dayText: { color: "#FFFFFF", fontSize: 12 },
+  dayText: { color: "#FFFFFF", fontSize: 14 },
+  outOfMonthText: { color: "rgba(255,255,255,0.3)" },
   predictedDayText: { color: "#FFD6D6" },
-  periodDay: { backgroundColor: "#D11B1B" },
+  periodDay: { backgroundColor: "#9a0d14" }, 
   periodDayText: { color: "#FFFFFF", fontWeight: "bold" },
   sectionTitle: {
     color: "#FFFFFF",
     fontSize: 14,
     marginBottom: 12,
+    paddingHorizontal: 20,
   },
   saveButton: {
-    alignSelf: "center",
+    marginTop: 10,
     marginBottom: 30,
-    backgroundColor: "#1A5FA8",
+    backgroundColor: "transparent",
+    borderWidth: 0.3,
+    borderColor: "#FFFFFF",
     borderRadius: 18,
     paddingHorizontal: 24,
     paddingVertical: 10,
-  },
+},
   saveButtonText: {
     color: "#FFFFFF",
     fontSize: 12,
-    fontWeight: "600",
+    fontWeight: "350",
     letterSpacing: 0.6,
   },
   cycleRow: {
     marginBottom: 12,
+    paddingHorizontal: 20,
   },
   cycleLabel: { color: "#FFFFFF", fontSize: 12, marginBottom: 6 },
   cycleBar: {

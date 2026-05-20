@@ -1,4 +1,5 @@
 import { formatDateKey, parseDateKey, useCycleData } from "@/hooks/use-cycle-store";
+import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useMemo, useState } from "react";
 import {
@@ -7,6 +8,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -14,24 +16,27 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 const { width } = Dimensions.get("window");
 const WEEKDAYS = ["S", "M", "T", "W", "T", "F", "S"];
 
-const buildMonthRange = (center: Date, pastMonths: number, futureMonths: number) => {
-  const start = new Date(center.getFullYear(), center.getMonth() - pastMonths, 1);
-  const total = pastMonths + futureMonths + 1;
-  return Array.from({ length: total }, (_, index) => {
-    const date = new Date(start.getFullYear(), start.getMonth() + index, 1);
-    return { year: date.getFullYear(), month: date.getMonth() };
-  });
-};
-
 const buildWeeks = (year: number, month: number) => {
   const firstDay = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const cells: (number | null)[] = [
-    ...Array(firstDay).fill(null),
-    ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
-  ];
-  while (cells.length < 42) cells.push(null);
-  const weeks: (number | null)[][] = [];
+  const prevMonthDays = new Date(year, month, 0).getDate();
+
+  const cells = [];
+
+  for (let i = firstDay - 1; i >= 0; i--) {
+    cells.push({ day: prevMonthDays - i, isCurrentMonth: false, monthOffset: -1 });
+  }
+
+  for (let i = 1; i <= daysInMonth; i++) {
+    cells.push({ day: i, isCurrentMonth: true, monthOffset: 0 });
+  }
+
+  let nextMonthDay = 1;
+  while (cells.length < 42) {
+    cells.push({ day: nextMonthDay++, isCurrentMonth: false, monthOffset: 1 });
+  }
+
+  const weeks = [];
   for (let i = 0; i < 42; i += 7) {
     weeks.push(cells.slice(i, i + 7));
   }
@@ -61,10 +66,11 @@ export default function InsightsScreen() {
     getLogsForDate,
     getSymptomFrequencyForMonth,
   } = useCycleData();
+  
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const [currentViewDate, setCurrentViewDate] = useState(new Date());
 
   const cycleStats = getCycleStats();
-  const months = useMemo(() => buildMonthRange(new Date(), 24, 24), []);
   const selectedLog = getLogsForDate(selectedDate);
   const moods = selectedLog?.moods ?? [];
   const symptoms = selectedLog?.symptoms ?? [];
@@ -93,6 +99,84 @@ export default function InsightsScreen() {
     ? `Recent mood focus: ${moods.slice(0, 2).join(" & ")}.`
     : "Log a mood to see patterns across your cycle.";
 
+  const handlePrevMonth = () => {
+    setCurrentViewDate((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
+  };
+
+  const handleNextMonth = () => {
+    setCurrentViewDate((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
+  };
+
+  const renderCalendar = () => {
+    const year = currentViewDate.getFullYear();
+    const month = currentViewDate.getMonth();
+    const monthLabel = formatMonthLabel(year, month);
+    const weeks = buildWeeks(year, month);
+
+    return (
+      <View style={styles.calendarCard}>
+        <View style={styles.monthHeader}>
+          <TouchableOpacity onPress={handlePrevMonth} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <Ionicons name="chevron-back" size={20} color="#4EA6FF" />
+          </TouchableOpacity>
+          
+          <Text style={styles.monthLabel}>{monthLabel}</Text>
+          
+          <TouchableOpacity onPress={handleNextMonth} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <Ionicons name="chevron-forward" size={20} color="#4EA6FF" />
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.weekRow}>
+          {WEEKDAYS.map((letter, idx) => (
+            <Text key={`${letter}-${idx}`} style={styles.weekdayLabel}>
+              {letter}
+            </Text>
+          ))}
+        </View>
+        
+        {weeks.map((week, index) => (
+          <View key={index} style={styles.weekRow}>
+            {week.map((cell, cellIndex) => {
+              const targetDate = new Date(year, month + cell.monthOffset, cell.day);
+              const dateKey = formatDateKey(targetDate);
+              const isPeriod = !!periodDates[dateKey];
+              const isPredicted = !!predictedDates[dateKey] && !isPeriod;
+              const isSelected =
+                selectedDate.getFullYear() === targetDate.getFullYear() &&
+                selectedDate.getMonth() === targetDate.getMonth() &&
+                selectedDate.getDate() === targetDate.getDate();
+
+              return (
+                <Pressable
+                  key={`${index}-${cellIndex}`}
+                  onPress={() => setSelectedDate(targetDate)}
+                  style={[
+                    styles.dayChip,
+                    isPredicted && styles.dayChipPredicted,
+                    isPeriod && styles.dayChipPeriod,
+                    isSelected && styles.dayChipSelected,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.dayText,
+                      !cell.isCurrentMonth && styles.outOfMonthText,
+                      isPredicted && styles.dayTextPredicted,
+                      isPeriod && styles.dayTextPeriod,
+                    ]}
+                  >
+                    {cell.day}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        ))}
+      </View>
+    );
+  };
+
   return (
     <LinearGradient colors={["#061736", "#1E3A78"]} style={styles.container}>
       <ScrollView
@@ -119,59 +203,8 @@ export default function InsightsScreen() {
         </View>
 
         <Text style={styles.subTitle}>Cycle Calendar</Text>
-        {months.map(({ year, month }) => {
-          const weeks = buildWeeks(year, month);
-          return (
-            <View key={`${year}-${month}`} style={styles.calendarCard}>
-              <Text style={styles.monthLabel}>{formatMonthLabel(year, month)}</Text>
-              <View style={styles.weekRow}>
-                {WEEKDAYS.map((letter, idx) => (
-                  <Text key={`${letter}-${idx}`} style={styles.weekdayLabel}>
-                    {letter}
-                  </Text>
-                ))}
-              </View>
-              {weeks.map((week, index) => (
-                <View key={index} style={styles.weekRow}>
-                  {week.map((day, cellIndex) => {
-                    if (!day) {
-                      return <View key={`empty-${cellIndex}`} style={styles.dayChip} />;
-                    }
-                    const dateKey = formatDateKey(new Date(year, month, day));
-                    const isPeriod = !!periodDates[dateKey];
-                    const isPredicted = !!predictedDates[dateKey] && !isPeriod;
-                    const isSelected =
-                      selectedDate.getFullYear() === year &&
-                      selectedDate.getMonth() === month &&
-                      selectedDate.getDate() === day;
-                    return (
-                      <Pressable
-                        key={dateKey}
-                        onPress={() => setSelectedDate(new Date(year, month, day))}
-                        style={[
-                          styles.dayChip,
-                          isPredicted && styles.dayChipPredicted,
-                          isPeriod && styles.dayChipPeriod,
-                          isSelected && styles.dayChipSelected,
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            styles.dayText,
-                            isPredicted && styles.dayTextPredicted,
-                            isPeriod && styles.dayTextPeriod,
-                          ]}
-                        >
-                          {day}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              ))}
-            </View>
-          );
-        })}
+        
+        {renderCalendar()}
 
         <Text style={styles.sectionHeader}>Logged Moods</Text>
         <View style={styles.iconRow}>
@@ -274,11 +307,18 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 16,
   },
+  monthHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 14,
+    paddingHorizontal: 10,
+  },
   monthLabel: {
     color: "#FFFFFF",
-    fontSize: 12,
+    fontSize: 16,
+    fontWeight: "bold",
     textAlign: "center",
-    marginBottom: 8,
   },
   weekRow: {
     flexDirection: "row",
@@ -288,7 +328,7 @@ const styles = StyleSheet.create({
   weekdayLabel: {
     color: "rgba(255,255,255,0.6)",
     fontSize: 10,
-    width: (width - 80) / 7,
+    width: (width - 90) / 7,
     textAlign: "center",
   },
   dayChip: {
@@ -310,6 +350,7 @@ const styles = StyleSheet.create({
     borderColor: "rgba(209, 27, 27, 0.5)",
   },
   dayText: { color: "#FFFFFF", fontSize: 12 },
+  outOfMonthText: { color: "rgba(255,255,255,0.3)" },
   dayTextPeriod: { color: "#FFFFFF", fontWeight: "bold" },
   dayTextPredicted: { color: "#FFD6D6" },
   sectionHeader: {

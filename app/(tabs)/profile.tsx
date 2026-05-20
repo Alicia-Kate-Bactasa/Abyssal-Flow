@@ -2,6 +2,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -15,13 +16,10 @@ export default function ProfileScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [description, setDescription] = useState("");
+  const [logoutVisible, setLogoutVisible] = useState(false);
 
   const handleLogout = () => {
     router.replace("/auth/login");
-  };
-
-  const handleActionPress = (label: string) => {
-    console.log("Profile action:", label);
   };
 
   return (
@@ -34,7 +32,7 @@ export default function ProfileScreen() {
       >
         <View style={styles.avatarWrapper}>
           <View style={styles.avatarCircle}>
-            <Text style={styles.avatarIcon}>👤</Text>
+            <Text style={styles.avatarIcon}></Text>
           </View>
           <View style={styles.avatarBadge}>
             <Text style={styles.avatarBadgeText}>+</Text>
@@ -52,24 +50,8 @@ export default function ProfileScreen() {
           onChangeText={setDescription}
         />
 
-        {Array.from({ length: 4 }, (_, index) => {
-          const label = "Edit Information";
-          return (
-            <Pressable
-              key={`${label}-${index}`}
-              onPress={() => handleActionPress(label)}
-              style={({ pressed }) => [
-                styles.actionButton,
-                pressed && styles.actionButtonPressed,
-              ]}
-            >
-              <Text style={styles.actionText}>{label}</Text>
-            </Pressable>
-          );
-        })}
-
         <Pressable
-          onPress={handleLogout}
+          onPress={() => setLogoutVisible(true)}
           style={({ pressed }) => [
             styles.logoutButton,
             pressed && styles.actionButtonPressed,
@@ -78,6 +60,40 @@ export default function ProfileScreen() {
           <Text style={styles.actionText}>Log out</Text>
         </Pressable>
       </ScrollView>
+
+      <Modal
+        transparent
+        visible={logoutVisible}
+        animationType="fade"
+        onRequestClose={() => setLogoutVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Log out of your account?</Text>
+            <View style={styles.modalActions}>
+              <Pressable
+                onPress={() => setLogoutVisible(false)}
+                style={({ pressed }) => [
+                  styles.modalButton,
+                  pressed && styles.modalButtonPressed,
+                ]}
+              >
+                <Text style={styles.modalButtonText}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                onPress={handleLogout}
+                style={({ pressed }) => [
+                  styles.modalButton,
+                  styles.modalButtonDanger,
+                  pressed && styles.modalButtonPressed,
+                ]}
+              >
+                <Text style={styles.modalButtonText}>Log out</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </LinearGradient>
   );
 }
@@ -128,29 +144,24 @@ const styles = StyleSheet.create({
     width: "100%",
     height: 90,
     borderRadius: 18,
-    backgroundColor: "rgba(19,33,75,0.7)",
+    backgroundColor: "transparent",
+    borderWidth: 1,
+    borderColor: "rgba(225,242,255,0.4)",
     marginBottom: 18,
     padding: 12,
     color: "#FFFFFF",
     textAlignVertical: "top",
   },
-  actionButton: {
-    width: "100%",
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: "rgba(19,33,75,0.7)",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 12,
-  },
   actionButtonPressed: {
     opacity: 0.7,
   },
   logoutButton: {
-    width: "100%",
+    width: 190,
     height: 48,
     borderRadius: 24,
-    backgroundColor: "rgba(19,33,75,0.9)",
+    backgroundColor: "transparent",
+    borderWidth: 1,
+    borderColor: "rgba(225,242,255,0.6)",
     justifyContent: "center",
     alignItems: "center",
     marginTop: 8,
@@ -158,5 +169,53 @@ const styles = StyleSheet.create({
   actionText: {
     color: "#FFFFFF",
     fontSize: 13,
+    fontFamily: "monospace",
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(6, 12, 28, 0.85)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modalCard: {
+    width: "82%",
+    borderRadius: 20,
+    padding: 20,
+    backgroundColor: "rgba(5, 14, 34, 0.95)",
+    borderWidth: 1,
+    borderColor: "rgba(225,242,255,0.35)",
+  },
+  modalTitle: {
+    fontFamily: "Georgia",
+    fontSize: 18,
+    color: "#FFFFFF",
+    textAlign: "center",
+    marginBottom: 18,
+  },
+  modalActions: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  modalButton: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "rgba(225,242,255,0.5)",
+    alignItems: "center",
+    backgroundColor: "transparent",
+  },
+  modalButtonDanger: {
+    borderColor: "rgba(209, 27, 27, 0.7)",
+  },
+  modalButtonPressed: {
+    opacity: 0.7,
+  },
+  modalButtonText: {
+    fontFamily: "monospace",
+    color: "#FFFFFF",
+    fontSize: 13,
+    letterSpacing: 0.6,
   },
 });

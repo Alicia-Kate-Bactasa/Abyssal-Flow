@@ -1,9 +1,10 @@
+import WaveBackground from "@/components/WaveBackground";
 import { OceanColors } from "@/constants/theme";
 import { MaterialIcons } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
+  Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -41,7 +42,7 @@ export default function SignupScreen() {
       // TODO: Implement actual signup logic
       console.log("Signup:", { username, email, password });
       // After successful signup, navigate to main app
-      router.replace("/landing1");
+      router.push("/landing");
     } catch (error) {
       console.error("Signup error:", error);
     } finally {
@@ -54,16 +55,11 @@ export default function SignupScreen() {
   };
 
   return (
-    <LinearGradient
-      colors={["#041539", "#26466D"]}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 0, y: 1 }}
-      style={styles.gradient}
-    >
-      <View style={styles.blurOverlay} pointerEvents="none" />
+    <View style={styles.container}>
+      <WaveBackground />
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={styles.container}
+        style={styles.keyboardContainer}
       >
         <ScrollView
           contentContainerStyle={styles.scrollContent}
@@ -72,13 +68,11 @@ export default function SignupScreen() {
           <View style={styles.content}>
             {/* Logo/Brand Section */}
             <View style={styles.logoSection}>
-              <View style={styles.logo}>
-                <MaterialIcons
-                  name="water-drop"
-                  size={40}
-                  color={OceanColors.cyan}
-                />
-              </View>
+              <Image
+                source={require("@/assets/images/abyssal-logo.png")}
+                style={styles.logoImage}
+                resizeMode="contain"
+              />
               <Text style={styles.brandName}>Abyssal Flow</Text>
             </View>
 
@@ -90,13 +84,13 @@ export default function SignupScreen() {
               <MaterialIcons
                 name="person-outline"
                 size={20}
-                color={OceanColors.inputText}
+                color={OceanColors.white}
                 style={styles.inputIcon}
               />
               <TextInput
                 style={styles.input}
                 placeholder="Username"
-                placeholderTextColor="#999"
+                placeholderTextColor="rgba(255,255,255,0.6)"
                 value={username}
                 onChangeText={setUsername}
                 autoCapitalize="none"
@@ -109,13 +103,13 @@ export default function SignupScreen() {
               <MaterialIcons
                 name="mail-outline"
                 size={20}
-                color={OceanColors.inputText}
+                color={OceanColors.white}
                 style={styles.inputIcon}
               />
               <TextInput
                 style={styles.input}
                 placeholder="Email"
-                placeholderTextColor="#999"
+                placeholderTextColor="rgba(255,255,255,0.6)"
                 value={email}
                 onChangeText={setEmail}
                 keyboardType="email-address"
@@ -129,26 +123,27 @@ export default function SignupScreen() {
               <MaterialIcons
                 name="lock-outline"
                 size={20}
-                color={OceanColors.inputText}
+                color={OceanColors.white}
                 style={styles.inputIcon}
               />
               <TextInput
                 style={styles.input}
                 placeholder="Password"
-                placeholderTextColor="#999"
+                placeholderTextColor="rgba(255,255,255,0.6)"
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry={!showPassword}
                 editable={!loading}
               />
               <TouchableOpacity
+                activeOpacity={1}
                 onPress={() => setShowPassword(!showPassword)}
                 disabled={!password}
               >
                 <MaterialIcons
                   name={showPassword ? "visibility" : "visibility-off"}
                   size={20}
-                  color={OceanColors.inputText}
+                  color={OceanColors.white}
                 />
               </TouchableOpacity>
             </View>
@@ -158,26 +153,27 @@ export default function SignupScreen() {
               <MaterialIcons
                 name="lock-outline"
                 size={20}
-                color={OceanColors.inputText}
+                color={OceanColors.white}
                 style={styles.inputIcon}
               />
               <TextInput
                 style={styles.input}
                 placeholder="Confirm password"
-                placeholderTextColor="#999"
+                placeholderTextColor="rgba(255,255,255,0.6)"
                 value={confirmPassword}
                 onChangeText={setConfirmPassword}
                 secureTextEntry={!showConfirmPassword}
                 editable={!loading}
               />
               <TouchableOpacity
+                activeOpacity={1}
                 onPress={() => setShowConfirmPassword(!showConfirmPassword)}
                 disabled={!confirmPassword}
               >
                 <MaterialIcons
                   name={showConfirmPassword ? "visibility" : "visibility-off"}
                   size={20}
-                  color={OceanColors.inputText}
+                  color={OceanColors.white}
                 />
               </TouchableOpacity>
             </View>
@@ -185,6 +181,7 @@ export default function SignupScreen() {
             {/* Terms Checkbox */}
             <View style={styles.checkboxContainer}>
               <TouchableOpacity
+                activeOpacity={1}
                 style={[
                   styles.checkbox,
                   termsAccepted && styles.checkboxChecked,
@@ -210,8 +207,9 @@ export default function SignupScreen() {
 
             {/* Sign Up Button */}
             <TouchableOpacity
+              activeOpacity={1}
               style={[styles.signupButton, loading && styles.buttonDisabled]}
-              onPress={() => router.push("/landing1")}
+              onPress={handleSignup}
               disabled={loading}
             >
               <Text style={styles.signupButtonText}>
@@ -222,62 +220,71 @@ export default function SignupScreen() {
             {/* Login Link */}
             <View style={styles.loginContainer}>
               <Text style={styles.loginText}>Already have an account? </Text>
-              <TouchableOpacity onPress={handleLoginNavigation}>
+              <TouchableOpacity activeOpacity={1} onPress={handleLoginNavigation}>
                 <Text style={styles.loginLink}>Dive Back In.</Text>
               </TouchableOpacity>
             </View>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-    </LinearGradient>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  gradient: {
+  container: {
     flex: 1,
   },
-  blurOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(4, 21, 57, 0.18)",
-  },
-  container: {
+  keyboardContainer: {
     flex: 1,
   },
   scrollContent: {
     flexGrow: 1,
-    justifyContent: "center",
+    justifyContent: "flex-start",
+    paddingTop: 28,
   },
   content: {
     paddingHorizontal: 24,
-    paddingVertical: 40,
+    paddingVertical: 24,
     zIndex: 1,
   },
   logoSection: {
     alignItems: "center",
-    marginBottom: 40,
+    justifyContent: "flex-start",
+    width: "100%",
+    height: 194,
+    marginBottom: 8,
+    position: "relative",
   },
-  logo: {
-    marginBottom: 12,
+  logoImage: {
+    width: 185,
+    height: 185,
+    position: "absolute",
+    top: 0,
   },
   brandName: {
     fontSize: 18,
-    fontWeight: "600",
+    fontFamily: Platform.OS === "ios" ? "Georgia" : "serif",
     color: OceanColors.textSecondary,
     letterSpacing: 1,
+    position: "absolute",
+    top: 181,
   },
   heading: {
     fontSize: 32,
-    fontWeight: "700",
+    fontFamily: Platform.OS === "ios" ? "Georgia" : "serif",
     color: OceanColors.white,
     marginBottom: 32,
     textAlign: "center",
+    fontWeight: "700",
   },
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: OceanColors.inputBg,
-    borderRadius: 12,
+    backgroundColor: "transparent",
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: "rgba(181,230,255,0.45)",
     paddingHorizontal: 16,
     marginBottom: 16,
     height: 50,
@@ -288,7 +295,8 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     fontSize: 16,
-    color: OceanColors.inputText,
+    fontFamily: Platform.OS === "ios" ? "Georgia" : "serif",
+    color: OceanColors.white,
   },
   checkboxContainer: {
     flexDirection: "row",
@@ -306,15 +314,16 @@ const styles = StyleSheet.create({
     marginTop: 2,
     alignItems: "center",
     justifyContent: "center",
+    backgroundColor: "transparent",
   },
   checkboxChecked: {
-    backgroundColor: OceanColors.cyan,
     borderColor: OceanColors.cyan,
   },
   termsText: {
     flex: 1,
     color: OceanColors.textSecondary,
     fontSize: 12,
+    fontFamily: Platform.OS === "ios" ? "Georgia" : "serif",
     lineHeight: 18,
   },
   termsLink: {
@@ -322,19 +331,23 @@ const styles = StyleSheet.create({
     textDecorationLine: "underline",
   },
   signupButton: {
-    backgroundColor: OceanColors.buttonBg,
-    borderRadius: 12,
+    backgroundColor: "transparent",
+    borderRadius: 999,
     paddingVertical: 14,
     alignItems: "center",
+    alignSelf: "center",
+    width: 180,
     marginBottom: 24,
+    borderWidth: 1,
+    borderColor: "rgba(181,230,255,0.7)",
   },
   buttonDisabled: {
-    opacity: 0.6,
+    opacity: 0.5,
   },
   signupButtonText: {
-    color: OceanColors.buttonText,
+    color: OceanColors.white,
     fontSize: 16,
-    fontWeight: "700",
+    fontFamily: Platform.OS === "ios" ? "Georgia" : "serif",
     letterSpacing: 0.5,
   },
   loginContainer: {
@@ -345,11 +358,12 @@ const styles = StyleSheet.create({
   loginText: {
     color: OceanColors.textSecondary,
     fontSize: 14,
+    fontFamily: Platform.OS === "ios" ? "Georgia" : "serif",
   },
   loginLink: {
     color: OceanColors.cyan,
     fontSize: 14,
-    fontWeight: "600",
+    fontFamily: Platform.OS === "ios" ? "Georgia" : "serif",
     textDecorationLine: "underline",
   },
 });

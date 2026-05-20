@@ -125,7 +125,7 @@ const PHASES: Record<PhaseKey, PhaseConfig> = {
       "Warm light returns to the water as your energy gently rebuilds. A quiet sense of renewal begins to rise.",
     moonColor: "#FFD768",
     waveColors: ["#FFB86A", "#FF8A7C"],
-    wavePoints: [132, 124, 140, 130, 120, 138, 132],
+    wavePoints: [132, 110, 160, 140, 120, 150, 132],
   },
   ovulation: {
     key: "ovulation",
@@ -149,7 +149,7 @@ const PHASES: Record<PhaseKey, PhaseConfig> = {
       "The ocean deepens under fading light. Your energy slows as your body prepares to reset. Take things gently today.",
     moonColor: "#FFFFFF",
     waveColors: ["#1E5E8F", "#0B3B5E"],
-    wavePoints: [120, 80, 170, 120, 95, 140, 120],
+    wavePoints: [120, 70, 175, 125, 75, 155, 120],
   },
 };
 
