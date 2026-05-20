@@ -11,7 +11,8 @@ import {
   Text,
   TouchableOpacity,
   TouchableWithoutFeedback,
-  View
+  View,
+  Dimensions,
 } from "react-native";
 
 // ─── Colours ──────────────────────────────────────────────────────────────────
@@ -28,10 +29,10 @@ const C = {
 };
 
 // ─── Layout Constants ─────────────────────────────────────────────────────────
-const TAB_BAR_HEIGHT = 60;
-const TAB_BAR_BOTTOM = 16;
+const TAB_BAR_HEIGHT = 65;
+const TAB_BAR_BOTTOM = 35;
 const CARET = 12;
-
+const { width } = Dimensions.get("window");
 // ─── TabIcon ──────────────────────────────────────────────────────────────────
 function TabIcon({
   name,
@@ -316,7 +317,9 @@ function AddModal({
     setSelected: React.Dispatch<React.SetStateAction<string[]>>,
   ) => {
     setSelected((prev) =>
-      prev.includes(value) ? prev.filter((item) => item !== value) : [...prev, value],
+      prev.includes(value)
+        ? prev.filter((item) => item !== value)
+        : [...prev, value],
     );
   };
 
@@ -387,7 +390,9 @@ function AddModal({
                   style={[styles.logCircle, active && styles.logCircleActive]}
                   onPress={() => toggleSelected(mood, setSelectedMoods)}
                 >
-                  <Text style={[styles.logText, active && styles.logTextActive]}>
+                  <Text
+                    style={[styles.logText, active && styles.logTextActive]}
+                  >
                     {mood.slice(0, 2).toUpperCase()}
                   </Text>
                 </Pressable>
@@ -409,7 +414,9 @@ function AddModal({
                   style={[styles.logCircle, active && styles.logCircleActive]}
                   onPress={() => toggleSelected(symptom, setSelectedSymptoms)}
                 >
-                  <Text style={[styles.logText, active && styles.logTextActive]}>
+                  <Text
+                    style={[styles.logText, active && styles.logTextActive]}
+                  >
                     {symptom
                       .split(" ")
                       .map((word) => word[0])
@@ -425,7 +432,12 @@ function AddModal({
             onPress={hasLogSelection ? handleLog : undefined}
             style={[styles.logBtn, !hasLogSelection && styles.logBtnDim]}
           >
-            <Text style={[styles.logBtnText, !hasLogSelection && styles.logBtnTextDim]}>
+            <Text
+              style={[
+                styles.logBtnText,
+                !hasLogSelection && styles.logBtnTextDim,
+              ]}
+            >
               Log
             </Text>
           </Pressable>
@@ -520,8 +532,8 @@ const styles = StyleSheet.create({
   tabBar: {
     position: "absolute",
     bottom: TAB_BAR_BOTTOM,
-    left: "8%",
-    right: "8%",
+    alignSelf: "center",
+    marginHorizontal: 20,
     height: TAB_BAR_HEIGHT,
     backgroundColor: C.bar,
     borderRadius: 50,

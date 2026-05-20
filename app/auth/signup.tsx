@@ -1,8 +1,8 @@
-import { OceanColors } from '@/constants/theme';
-import { MaterialIcons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import { OceanColors } from "@/constants/theme";
+import { MaterialIcons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
+import { useRouter } from "expo-router";
+import React, { useState } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -12,14 +12,14 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-} from 'react-native';
+} from "react-native";
 
 export default function SignupScreen() {
   const router = useRouter();
-  const [username, setUsername] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -27,23 +27,23 @@ export default function SignupScreen() {
 
   const handleSignup = async () => {
     if (!termsAccepted) {
-      alert('Please accept the Terms of Service and Privacy Policy');
+      alert("Please accept the Terms of Service and Privacy Policy");
       return;
     }
 
     if (password !== confirmPassword) {
-      alert('Passwords do not match');
+      alert("Passwords do not match");
       return;
     }
 
     setLoading(true);
     try {
       // TODO: Implement actual signup logic
-      console.log('Signup:', { username, email, password });
+      console.log("Signup:", { username, email, password });
       // After successful signup, navigate to main app
-      router.replace('/landing1');
+      router.replace("/landing1");
     } catch (error) {
-      console.error('Signup error:', error);
+      console.error("Signup error:", error);
     } finally {
       setLoading(false);
     }
@@ -55,134 +55,178 @@ export default function SignupScreen() {
 
   return (
     <LinearGradient
-      colors={['#041539', '#26466D']}
+      colors={["#041539", "#26466D"]}
       start={{ x: 0, y: 0 }}
       end={{ x: 0, y: 1 }}
       style={styles.gradient}
     >
       <View style={styles.blurOverlay} pointerEvents="none" />
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={styles.container}
       >
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
           <View style={styles.content}>
-          {/* Logo/Brand Section */}
-          <View style={styles.logoSection}>
-            <View style={styles.logo}>
-              <MaterialIcons name="water-drop" size={40} color={OceanColors.cyan} />
+            {/* Logo/Brand Section */}
+            <View style={styles.logoSection}>
+              <View style={styles.logo}>
+                <MaterialIcons
+                  name="water-drop"
+                  size={40}
+                  color={OceanColors.cyan}
+                />
+              </View>
+              <Text style={styles.brandName}>Abyssal Flow</Text>
             </View>
-            <Text style={styles.brandName}>Abyssal Flow</Text>
-          </View>
 
-          {/* Main Heading */}
-          <Text style={styles.heading}>Dive in</Text>
+            {/* Main Heading */}
+            <Text style={styles.heading}>Dive in</Text>
 
-          {/* Username Input */}
-          <View style={styles.inputContainer}>
-            <MaterialIcons name="person-outline" size={20} color={OceanColors.inputText} style={styles.inputIcon} />
-            <TextInput
-              style={styles.input}
-              placeholder="Username"
-              placeholderTextColor="#999"
-              value={username}
-              onChangeText={setUsername}
-              autoCapitalize="none"
-              editable={!loading}
-            />
-          </View>
-
-          {}
-          <View style={styles.inputContainer}>
-            <MaterialIcons name="mail-outline" size={20} color={OceanColors.inputText} style={styles.inputIcon} />
-            <TextInput
-              style={styles.input}
-              placeholder="Email"
-              placeholderTextColor="#999"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              editable={!loading}
-            />
-          </View>
-
-          {}
-          <View style={styles.inputContainer}>
-            <MaterialIcons name="lock-outline" size={20} color={OceanColors.inputText} style={styles.inputIcon} />
-            <TextInput
-              style={styles.input}
-              placeholder="Password"
-              placeholderTextColor="#999"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry={!showPassword}
-              editable={!loading}
-            />
-            <TouchableOpacity onPress={() => setShowPassword(!showPassword)} disabled={!password}>
+            {/* Username Input */}
+            <View style={styles.inputContainer}>
               <MaterialIcons
-                name={showPassword ? 'visibility' : 'visibility-off'}
+                name="person-outline"
                 size={20}
                 color={OceanColors.inputText}
+                style={styles.inputIcon}
               />
-            </TouchableOpacity>
-          </View>
+              <TextInput
+                style={styles.input}
+                placeholder="Username"
+                placeholderTextColor="#999"
+                value={username}
+                onChangeText={setUsername}
+                autoCapitalize="none"
+                editable={!loading}
+              />
+            </View>
 
-          {/* Confirm Password Input */}
-          <View style={styles.inputContainer}>
-            <MaterialIcons name="lock-outline" size={20} color={OceanColors.inputText} style={styles.inputIcon} />
-            <TextInput
-              style={styles.input}
-              placeholder="Confirm password"
-              placeholderTextColor="#999"
-              value={confirmPassword}
-              onChangeText={setConfirmPassword}
-              secureTextEntry={!showConfirmPassword}
-              editable={!loading}
-            />
-            <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)} disabled={!confirmPassword}>
+            {}
+            <View style={styles.inputContainer}>
               <MaterialIcons
-                name={showConfirmPassword ? 'visibility' : 'visibility-off'}
+                name="mail-outline"
                 size={20}
                 color={OceanColors.inputText}
+                style={styles.inputIcon}
               />
-            </TouchableOpacity>
-          </View>
+              <TextInput
+                style={styles.input}
+                placeholder="Email"
+                placeholderTextColor="#999"
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                editable={!loading}
+              />
+            </View>
 
-          {/* Terms Checkbox */}
-          <View style={styles.checkboxContainer}>
+            {}
+            <View style={styles.inputContainer}>
+              <MaterialIcons
+                name="lock-outline"
+                size={20}
+                color={OceanColors.inputText}
+                style={styles.inputIcon}
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="Password"
+                placeholderTextColor="#999"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry={!showPassword}
+                editable={!loading}
+              />
+              <TouchableOpacity
+                onPress={() => setShowPassword(!showPassword)}
+                disabled={!password}
+              >
+                <MaterialIcons
+                  name={showPassword ? "visibility" : "visibility-off"}
+                  size={20}
+                  color={OceanColors.inputText}
+                />
+              </TouchableOpacity>
+            </View>
+
+            {/* Confirm Password Input */}
+            <View style={styles.inputContainer}>
+              <MaterialIcons
+                name="lock-outline"
+                size={20}
+                color={OceanColors.inputText}
+                style={styles.inputIcon}
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="Confirm password"
+                placeholderTextColor="#999"
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+                secureTextEntry={!showConfirmPassword}
+                editable={!loading}
+              />
+              <TouchableOpacity
+                onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                disabled={!confirmPassword}
+              >
+                <MaterialIcons
+                  name={showConfirmPassword ? "visibility" : "visibility-off"}
+                  size={20}
+                  color={OceanColors.inputText}
+                />
+              </TouchableOpacity>
+            </View>
+
+            {/* Terms Checkbox */}
+            <View style={styles.checkboxContainer}>
+              <TouchableOpacity
+                style={[
+                  styles.checkbox,
+                  termsAccepted && styles.checkboxChecked,
+                ]}
+                onPress={() => setTermsAccepted(!termsAccepted)}
+                disabled={loading}
+              >
+                {termsAccepted && (
+                  <MaterialIcons
+                    name="check"
+                    size={16}
+                    color={OceanColors.white}
+                  />
+                )}
+              </TouchableOpacity>
+              <Text style={styles.termsText}>
+                By diving in, you agree to our{" "}
+                <Text style={styles.termsLink}>
+                  Terms of Service and Privacy Policy.
+                </Text>
+              </Text>
+            </View>
+
+            {/* Sign Up Button */}
             <TouchableOpacity
-              style={[styles.checkbox, termsAccepted && styles.checkboxChecked]}
-              onPress={() => setTermsAccepted(!termsAccepted)}
+              style={[styles.signupButton, loading && styles.buttonDisabled]}
+              onPress={() => router.push("/landing1")}
               disabled={loading}
             >
-              {termsAccepted && (
-                <MaterialIcons name="check" size={16} color={OceanColors.white} />
-              )}
+              <Text style={styles.signupButtonText}>
+                {loading ? "Signing Up..." : "Sign Up"}
+              </Text>
             </TouchableOpacity>
-            <Text style={styles.termsText}>
-              By diving in, you agree to our{' '}
-              <Text style={styles.termsLink}>Terms of Service and Privacy Policy.</Text>
-            </Text>
-          </View>
 
-          {/* Sign Up Button */}
-          <TouchableOpacity
-            style={[styles.signupButton, loading && styles.buttonDisabled]}
-            onPress={handleSignup}
-            disabled={loading}
-          >
-            <Text style={styles.signupButtonText}>{loading ? 'Signing Up...' : 'Sign Up'}</Text>
-          </TouchableOpacity>
-
-          {/* Login Link */}
-          <View style={styles.loginContainer}>
-            <Text style={styles.loginText}>Already have an account? </Text>
-            <TouchableOpacity onPress={handleLoginNavigation}>
-              <Text style={styles.loginLink}>Dive Back In.</Text>
-            </TouchableOpacity>
+            {/* Login Link */}
+            <View style={styles.loginContainer}>
+              <Text style={styles.loginText}>Already have an account? </Text>
+              <TouchableOpacity onPress={handleLoginNavigation}>
+                <Text style={styles.loginLink}>Dive Back In.</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </LinearGradient>
@@ -195,14 +239,14 @@ const styles = StyleSheet.create({
   },
   blurOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(4, 21, 57, 0.18)',
+    backgroundColor: "rgba(4, 21, 57, 0.18)",
   },
   container: {
     flex: 1,
   },
   scrollContent: {
     flexGrow: 1,
-    justifyContent: 'center',
+    justifyContent: "center",
   },
   content: {
     paddingHorizontal: 24,
@@ -210,7 +254,7 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   logoSection: {
-    alignItems: 'center',
+    alignItems: "center",
     marginBottom: 40,
   },
   logo: {
@@ -218,20 +262,20 @@ const styles = StyleSheet.create({
   },
   brandName: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: "600",
     color: OceanColors.textSecondary,
     letterSpacing: 1,
   },
   heading: {
     fontSize: 32,
-    fontWeight: '700',
+    fontWeight: "700",
     color: OceanColors.white,
     marginBottom: 32,
-    textAlign: 'center',
+    textAlign: "center",
   },
   inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: OceanColors.inputBg,
     borderRadius: 12,
     paddingHorizontal: 16,
@@ -247,8 +291,8 @@ const styles = StyleSheet.create({
     color: OceanColors.inputText,
   },
   checkboxContainer: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    alignItems: "flex-start",
     marginBottom: 24,
     paddingHorizontal: 4,
   },
@@ -260,8 +304,8 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     marginRight: 12,
     marginTop: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   checkboxChecked: {
     backgroundColor: OceanColors.cyan,
@@ -275,13 +319,13 @@ const styles = StyleSheet.create({
   },
   termsLink: {
     color: OceanColors.cyan,
-    textDecorationLine: 'underline',
+    textDecorationLine: "underline",
   },
   signupButton: {
     backgroundColor: OceanColors.buttonBg,
     borderRadius: 12,
     paddingVertical: 14,
-    alignItems: 'center',
+    alignItems: "center",
     marginBottom: 24,
   },
   buttonDisabled: {
@@ -290,13 +334,13 @@ const styles = StyleSheet.create({
   signupButtonText: {
     color: OceanColors.buttonText,
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: "700",
     letterSpacing: 0.5,
   },
   loginContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
   },
   loginText: {
     color: OceanColors.textSecondary,
@@ -305,7 +349,7 @@ const styles = StyleSheet.create({
   loginLink: {
     color: OceanColors.cyan,
     fontSize: 14,
-    fontWeight: '600',
-    textDecorationLine: 'underline',
+    fontWeight: "600",
+    textDecorationLine: "underline",
   },
 });

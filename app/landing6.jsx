@@ -1,6 +1,7 @@
 import WaveBackground from "@/components/WaveBackground";
 import { LinearGradient } from "expo-linear-gradient";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter, usePathname } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useRef, useState } from "react";
 import {
   Animated,
@@ -27,6 +28,7 @@ const OPTIONS = [
 
 export default function Landing6() {
   const router = useRouter();
+  const pathname = usePathname();
   const params = useLocalSearchParams();
   const [selected, setSelected] = useState(null);
 
@@ -90,6 +92,13 @@ export default function Landing6() {
           showsVerticalScrollIndicator={false}
           bounces={false}
         >
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={styles.backButton}
+          >
+            <Ionicons name="chevron-back" size={28} color="#FFFFFF" />
+          </TouchableOpacity>
+
           <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
             <View style={styles.innerContainer}>
               {/* ── Content ── */}
@@ -190,6 +199,13 @@ const styles = StyleSheet.create({
   innerContainer: {
     flex: 1,
     justifyContent: "space-between",
+  },
+  backButton: {
+    position: "absolute",
+    top: 60,
+    left: 16,
+    zIndex: 10,
+    padding: 8,
   },
   content: {
     flex: 1,

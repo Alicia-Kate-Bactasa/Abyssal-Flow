@@ -1,17 +1,18 @@
 import WaveBackground from "@/components/WaveBackground";
 import { LinearGradient } from "expo-linear-gradient";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter, usePathname } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useRef, useState } from "react";
 import {
-    Animated,
-    Dimensions,
-    Platform,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Animated,
+  Dimensions,
+  Platform,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 const { height } = Dimensions.get("window");
@@ -19,8 +20,18 @@ const { height } = Dimensions.get("window");
 const DAYS = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
 
 const MONTHS = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
 ];
 
 function getDaysInMonth(year, month) {
@@ -33,6 +44,7 @@ function getFirstDayOfMonth(year, month) {
 
 export default function Landing8() {
   const router = useRouter();
+  const pathname = usePathname();
   const params = useLocalSearchParams();
 
   const now = new Date();
@@ -49,12 +61,32 @@ export default function Landing8() {
   useEffect(() => {
     Animated.stagger(150, [
       Animated.parallel([
-        Animated.timing(titleOpacity, { toValue: 1, duration: 600, useNativeDriver: true }),
-        Animated.timing(titleY, { toValue: 0, duration: 600, useNativeDriver: true }),
+        Animated.timing(titleOpacity, {
+          toValue: 1,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+        Animated.timing(titleY, {
+          toValue: 0,
+          duration: 600,
+          useNativeDriver: true,
+        }),
       ]),
-      Animated.timing(subtitleOpacity, { toValue: 1, duration: 500, useNativeDriver: true }),
-      Animated.timing(calendarOpacity, { toValue: 1, duration: 500, useNativeDriver: true }),
-      Animated.timing(buttonOpacity, { toValue: 1, duration: 500, useNativeDriver: true }),
+      Animated.timing(subtitleOpacity, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+      Animated.timing(calendarOpacity, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+      Animated.timing(buttonOpacity, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }),
     ]).start();
   }, []);
 
@@ -81,7 +113,7 @@ export default function Landing8() {
     setSelectedDates((prev) =>
       prev.includes(dateKey)
         ? prev.filter((d) => d !== dateKey)
-        : [...prev, dateKey]
+        : [...prev, dateKey],
     );
   };
 
@@ -110,10 +142,12 @@ export default function Landing8() {
           onPress={() => toggleDate(day)}
           activeOpacity={0.7}
         >
-          <Text style={[styles.dayNumber, selected && styles.dayNumberSelected]}>
+          <Text
+            style={[styles.dayNumber, selected && styles.dayNumberSelected]}
+          >
             {day}
           </Text>
-        </TouchableOpacity>
+        </TouchableOpacity>,
       );
     }
 
@@ -137,34 +171,53 @@ export default function Landing8() {
         showsVerticalScrollIndicator={false}
         bounces={false}
       >
-        <View style={styles.innerContainer}>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={styles.backButton}
+        >
+          <Ionicons name="chevron-back" size={28} color="#FFFFFF" />
+        </TouchableOpacity>
 
+        <View style={styles.innerContainer}>
           {/* ── Content ── */}
           <View style={styles.content}>
             {/* Title */}
             <Animated.Text
-              style={[styles.title, { opacity: titleOpacity, transform: [{ translateY: titleY }] }]}
+              style={[
+                styles.title,
+                { opacity: titleOpacity, transform: [{ translateY: titleY }] },
+              ]}
             >
               Your Recent History
             </Animated.Text>
 
             {/* Subtitle */}
-            <Animated.Text style={[styles.subtitle, { opacity: subtitleOpacity }]}>
-              Tap the dates of your last period. The more logs you provide, the more accurate our prediction becomes.
+            <Animated.Text
+              style={[styles.subtitle, { opacity: subtitleOpacity }]}
+            >
+              Tap the dates of your last period. The more logs you provide, the
+              more accurate our prediction becomes.
             </Animated.Text>
 
             {/* Calendar */}
-            <Animated.View style={[styles.calendar, { opacity: calendarOpacity }]}>
-
+            <Animated.View
+              style={[styles.calendar, { opacity: calendarOpacity }]}
+            >
               {/* Month navigation */}
               <View style={styles.calendarHeader}>
-                <TouchableOpacity onPress={goToPrevMonth} style={styles.navButton}>
+                <TouchableOpacity
+                  onPress={goToPrevMonth}
+                  style={styles.navButton}
+                >
                   <Text style={styles.navArrow}>‹</Text>
                 </TouchableOpacity>
                 <Text style={styles.monthLabel}>
                   {MONTHS[currentMonth]} {currentYear}
                 </Text>
-                <TouchableOpacity onPress={goToNextMonth} style={styles.navButton}>
+                <TouchableOpacity
+                  onPress={goToNextMonth}
+                  style={styles.navButton}
+                >
                   <Text style={styles.navArrow}>›</Text>
                 </TouchableOpacity>
               </View>
@@ -172,22 +225,26 @@ export default function Landing8() {
               {/* Day headers */}
               <View style={styles.dayHeaders}>
                 {DAYS.map((d) => (
-                  <Text key={d} style={styles.dayHeader}>{d}</Text>
+                  <Text key={d} style={styles.dayHeader}>
+                    {d}
+                  </Text>
                 ))}
               </View>
 
               {/* Day grid */}
-              <View style={styles.dayGrid}>
-                {renderCalendarDays()}
-              </View>
-
+              <View style={styles.dayGrid}>{renderCalendarDays()}</View>
             </Animated.View>
           </View>
 
           {/* ── Next Button ── */}
-          <Animated.View style={[styles.buttonContainer, { opacity: buttonOpacity }]}>
+          <Animated.View
+            style={[styles.buttonContainer, { opacity: buttonOpacity }]}
+          >
             <TouchableOpacity
-              style={[styles.button, selectedDates.length === 0 && styles.buttonDisabled]}
+              style={[
+                styles.button,
+                selectedDates.length === 0 && styles.buttonDisabled,
+              ]}
               onPress={() => {
                 router.push({
                   pathname: "/landing9",
@@ -199,7 +256,6 @@ export default function Landing8() {
               <Text style={styles.buttonText}>Next</Text>
             </TouchableOpacity>
           </Animated.View>
-
         </View>
       </ScrollView>
     </LinearGradient>
@@ -216,6 +272,13 @@ const styles = StyleSheet.create({
   innerContainer: {
     flex: 1,
     justifyContent: "space-between",
+  },
+  backButton: {
+    position: "absolute",
+    top: 60,
+    left: 16,
+    zIndex: 10,
+    padding: 8,
   },
   content: {
     flex: 1,

@@ -1,26 +1,28 @@
 import WaveBackground from "@/components/WaveBackground";
 import { LinearGradient } from "expo-linear-gradient";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter, usePathname } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useRef } from "react";
 import {
-    Animated,
-    Dimensions,
-    Keyboard,
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    TouchableWithoutFeedback,
-    View,
+  Animated,
+  Dimensions,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  View,
 } from "react-native";
 
 const { height } = Dimensions.get("window");
 
 export default function Landing3() {
   const router = useRouter();
+  const pathname = usePathname();
   const params = useLocalSearchParams();
 
   // Fade-in animations
@@ -78,6 +80,13 @@ export default function Landing3() {
           showsVerticalScrollIndicator={false}
           bounces={false}
         >
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={styles.backButton}
+          >
+            <Ionicons name="chevron-back" size={28} color="#FFFFFF" />
+          </TouchableOpacity>
+
           <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
             <View style={styles.innerContainer}>
               {/* ── Content ── */}
@@ -144,6 +153,13 @@ const styles = StyleSheet.create({
   innerContainer: {
     flex: 1,
     justifyContent: "space-between",
+  },
+  backButton: {
+    position: "absolute",
+    top: 60,
+    left: 16,
+    zIndex: 10,
+    padding: 8,
   },
   content: {
     flex: 1,

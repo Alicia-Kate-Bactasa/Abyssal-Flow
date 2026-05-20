@@ -1,22 +1,24 @@
 import WaveBackground from "@/components/WaveBackground";
 import { LinearGradient } from "expo-linear-gradient";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter, usePathname } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useRef } from "react";
 import {
-    Animated,
-    Dimensions,
-    Platform,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Animated,
+  Dimensions,
+  Platform,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 const { height } = Dimensions.get("window");
 
 export default function Landing15() {
   const router = useRouter();
+  const pathname = usePathname();
   const params = useLocalSearchParams();
 
   const checkScale = useRef(new Animated.Value(0)).current;
@@ -71,15 +73,36 @@ export default function Landing15() {
       style={styles.gradient}
     >
       <StatusBar barStyle="light-content" />
+      <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+        <Ionicons name="chevron-back" size={28} color="#FFFFFF" />
+      </TouchableOpacity>
 
       {/* ── Background ── */}
       <WaveBackground />
 
       <View style={styles.innerContainer}>
+        {/* Back Button */}
+        <TouchableOpacity
+          onPress={() => {
+            const currentPageNumber = parseInt(pathname.replace(/[^0-9]/g, ""));
+            const previousPageNumber = currentPageNumber - 1;
+
+            if (previousPageNumber >= 1) {
+              router.push({
+                pathname: `/landing${previousPageNumber}`,
+                params: params,
+              });
+            } else {
+              router.back();
+            }
+          }}
+          style={styles.backButton}
+        >
+          <Ionicons name="chevron-back" size={28} color="#FFFFFF" />
+        </TouchableOpacity>
 
         {/* ── Content ── */}
         <View style={styles.content}>
-
           {/* Checkmark */}
           <Animated.Text
             style={[
@@ -105,11 +128,12 @@ export default function Landing15() {
           >
             Finished!
           </Animated.Text>
-
         </View>
 
         {/* ── Next Button ── */}
-        <Animated.View style={[styles.buttonContainer, { opacity: buttonOpacity }]}>
+        <Animated.View
+          style={[styles.buttonContainer, { opacity: buttonOpacity }]}
+        >
           <TouchableOpacity
             style={styles.button}
             onPress={() => router.replace("/")}
@@ -118,7 +142,6 @@ export default function Landing15() {
             <Text style={styles.buttonText}>Next</Text>
           </TouchableOpacity>
         </Animated.View>
-
       </View>
     </LinearGradient>
   );
@@ -131,6 +154,13 @@ const styles = StyleSheet.create({
   innerContainer: {
     flex: 1,
     justifyContent: "space-between",
+  },
+  backButton: {
+    position: "absolute",
+    top: 60,
+    left: 16,
+    zIndex: 10,
+    padding: 8,
   },
   content: {
     flex: 1,

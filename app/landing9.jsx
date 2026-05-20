@@ -1,17 +1,18 @@
 import WaveBackground from "@/components/WaveBackground";
 import { LinearGradient } from "expo-linear-gradient";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter, usePathname } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useRef, useState } from "react";
 import {
-    Animated,
-    Dimensions,
-    FlatList,
-    Platform,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Animated,
+  Dimensions,
+  FlatList,
+  Platform,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 const { height } = Dimensions.get("window");
@@ -29,6 +30,7 @@ const DEFAULT = "28";
 
 export default function Landing9() {
   const router = useRouter();
+  const pathname = usePathname();
   const params = useLocalSearchParams();
   const [selected, setSelected] = useState(DEFAULT);
   const flatListRef = useRef(null);
@@ -42,18 +44,41 @@ export default function Landing9() {
   useEffect(() => {
     Animated.stagger(150, [
       Animated.parallel([
-        Animated.timing(titleOpacity, { toValue: 1, duration: 600, useNativeDriver: true }),
-        Animated.timing(titleY, { toValue: 0, duration: 600, useNativeDriver: true }),
+        Animated.timing(titleOpacity, {
+          toValue: 1,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+        Animated.timing(titleY, {
+          toValue: 0,
+          duration: 600,
+          useNativeDriver: true,
+        }),
       ]),
-      Animated.timing(subtitleOpacity, { toValue: 1, duration: 500, useNativeDriver: true }),
-      Animated.timing(pickerOpacity, { toValue: 1, duration: 500, useNativeDriver: true }),
-      Animated.timing(buttonOpacity, { toValue: 1, duration: 500, useNativeDriver: true }),
+      Animated.timing(subtitleOpacity, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+      Animated.timing(pickerOpacity, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+      Animated.timing(buttonOpacity, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }),
     ]).start();
 
     // Scroll to default value
     const defaultIndex = CYCLE_OPTIONS.indexOf(DEFAULT);
     setTimeout(() => {
-      flatListRef.current?.scrollToIndex({ index: defaultIndex, animated: false });
+      flatListRef.current?.scrollToIndex({
+        index: defaultIndex,
+        animated: false,
+      });
     }, 100);
   }, []);
 
@@ -84,68 +109,81 @@ export default function Landing9() {
       {/* ── Background ── */}
       <WaveBackground />
 
-        <View style={styles.innerContainer}>
+      <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+        <Ionicons name="chevron-back" size={28} color="#FFFFFF" />
+      </TouchableOpacity>
 
-          {/* ── Content ── */}
-          <View style={styles.content}>
+      <View style={styles.innerContainer}>
+        {/* ── Content ── */}
+        <View style={styles.content}>
+          {/* Title */}
+          <Animated.Text
+            style={[
+              styles.title,
+              { opacity: titleOpacity, transform: [{ translateY: titleY }] },
+            ]}
+          >
+            Cycle Length
+          </Animated.Text>
 
-            {/* Title */}
-            <Animated.Text
-              style={[styles.title, { opacity: titleOpacity, transform: [{ translateY: titleY }] }]}
-            >
-              Cycle Length
-            </Animated.Text>
+          {/* Subtitle */}
+          <Animated.Text
+            style={[styles.subtitle, { opacity: subtitleOpacity }]}
+          >
+            On average, how many days are there from the start of one period to
+            the start of the next?
+          </Animated.Text>
 
-            {/* Subtitle */}
-            <Animated.Text style={[styles.subtitle, { opacity: subtitleOpacity }]}>
-              On average, how many days are there from the start of one period to the start of the next?
-            </Animated.Text>
+          {/* Picker */}
+          <Animated.View
+            style={[styles.pickerWrapper, { opacity: pickerOpacity }]}
+          >
+            {/* Highlight bar */}
+            <View style={styles.selectionHighlight} pointerEvents="none" />
 
-            {/* Picker */}
-            <Animated.View style={[styles.pickerWrapper, { opacity: pickerOpacity }]}>
-              {/* Highlight bar */}
-              <View style={styles.selectionHighlight} pointerEvents="none" />
-
-              <FlatList
-                ref={flatListRef}
-                data={CYCLE_OPTIONS}
-                keyExtractor={(item) => item}
-                renderItem={renderItem}
-                showsVerticalScrollIndicator={false}
-                style={styles.flatList}
-                contentContainerStyle={styles.flatListContent}
-                snapToInterval={ITEM_HEIGHT}
-                decelerationRate="fast"
-                getItemLayout={(_, index) => ({
-                  length: ITEM_HEIGHT,
-                  offset: ITEM_HEIGHT * index,
-                  index,
-                })}
-                onMomentumScrollEnd={(e) => {
-                  const index = Math.round(e.nativeEvent.contentOffset.y / ITEM_HEIGHT);
-                  if (CYCLE_OPTIONS[index]) setSelected(CYCLE_OPTIONS[index]);
-                }}
-              />
-            </Animated.View>
-          </View>
-
-          {/* ── Next Button ── */}
-          <Animated.View style={[styles.buttonContainer, { opacity: buttonOpacity }]}>
-            <TouchableOpacity
-              style={styles.button}
-              onPress={() => {
-                router.push({
-                  pathname: "/landing10",
-                  params: { ...params, cycleLength: selected },
-                });
+            <FlatList
+              ref={flatListRef}
+              data={CYCLE_OPTIONS}
+              keyExtractor={(item) => item}
+              renderItem={renderItem}
+              showsVerticalScrollIndicator={false}
+              style={styles.flatList}
+              contentContainerStyle={styles.flatListContent}
+              snapToInterval={ITEM_HEIGHT}
+              decelerationRate="fast"
+              getItemLayout={(_, index) => ({
+                length: ITEM_HEIGHT,
+                offset: ITEM_HEIGHT * index,
+                index,
+              })}
+              onMomentumScrollEnd={(e) => {
+                const index = Math.round(
+                  e.nativeEvent.contentOffset.y / ITEM_HEIGHT,
+                );
+                if (CYCLE_OPTIONS[index]) setSelected(CYCLE_OPTIONS[index]);
               }}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.buttonText}>Next</Text>
-            </TouchableOpacity>
+            />
           </Animated.View>
-
         </View>
+
+        {/* ── Next Button ── */}
+        <Animated.View
+          style={[styles.buttonContainer, { opacity: buttonOpacity }]}
+        >
+          <TouchableOpacity
+            style={styles.button}
+            onPress={() => {
+              router.push({
+                pathname: "/landing10",
+                params: { ...params, cycleLength: selected },
+              });
+            }}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.buttonText}>Next</Text>
+          </TouchableOpacity>
+        </Animated.View>
+      </View>
     </LinearGradient>
   );
 }
@@ -157,6 +195,13 @@ const styles = StyleSheet.create({
   innerContainer: {
     flex: 1,
     justifyContent: "space-between",
+  },
+  backButton: {
+    position: "absolute",
+    top: 60,
+    left: 16,
+    zIndex: 10,
+    padding: 8,
   },
   content: {
     flex: 1,

@@ -1,20 +1,21 @@
 import WaveBackground from "@/components/WaveBackground";
 import { LinearGradient } from "expo-linear-gradient";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter, usePathname } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useRef, useState } from "react";
 import {
-    Animated,
-    Dimensions,
-    Keyboard,
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    TouchableWithoutFeedback,
-    View,
+  Animated,
+  Dimensions,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  View,
 } from "react-native";
 
 const { height } = Dimensions.get("window");
@@ -28,6 +29,7 @@ const FOODS = [
 
 export default function Landing13() {
   const router = useRouter();
+  const pathname = usePathname();
   const params = useLocalSearchParams();
   const [selected, setSelected] = useState([]);
 
@@ -40,18 +42,38 @@ export default function Landing13() {
   useEffect(() => {
     Animated.stagger(150, [
       Animated.parallel([
-        Animated.timing(titleOpacity, { toValue: 1, duration: 600, useNativeDriver: true }),
-        Animated.timing(titleY, { toValue: 0, duration: 600, useNativeDriver: true }),
+        Animated.timing(titleOpacity, {
+          toValue: 1,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+        Animated.timing(titleY, {
+          toValue: 0,
+          duration: 600,
+          useNativeDriver: true,
+        }),
       ]),
-      Animated.timing(subtitleOpacity, { toValue: 1, duration: 500, useNativeDriver: true }),
-      Animated.timing(listOpacity, { toValue: 1, duration: 500, useNativeDriver: true }),
-      Animated.timing(buttonOpacity, { toValue: 1, duration: 500, useNativeDriver: true }),
+      Animated.timing(subtitleOpacity, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+      Animated.timing(listOpacity, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+      Animated.timing(buttonOpacity, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }),
     ]).start();
   }, []);
 
   const handleSelect = (id) => {
     setSelected((prev) =>
-      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id],
     );
   };
 
@@ -77,26 +99,41 @@ export default function Landing13() {
           showsVerticalScrollIndicator={false}
           bounces={false}
         >
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={styles.backButton}
+          >
+            <Ionicons name="chevron-back" size={28} color="#FFFFFF" />
+          </TouchableOpacity>
+
           <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
             <View style={styles.innerContainer}>
-
               {/* ── Content ── */}
               <View style={styles.content}>
-
                 {/* Title */}
                 <Animated.Text
-                  style={[styles.title, { opacity: titleOpacity, transform: [{ translateY: titleY }] }]}
+                  style={[
+                    styles.title,
+                    {
+                      opacity: titleOpacity,
+                      transform: [{ translateY: titleY }],
+                    },
+                  ]}
                 >
                   Favorite Comfort Food
                 </Animated.Text>
 
                 {/* Subtitle */}
-                <Animated.Text style={[styles.subtitle, { opacity: subtitleOpacity }]}>
+                <Animated.Text
+                  style={[styles.subtitle, { opacity: subtitleOpacity }]}
+                >
                   What is your go-to snack during your period?
                 </Animated.Text>
 
                 {/* Options */}
-                <Animated.View style={[styles.listContainer, { opacity: listOpacity }]}>
+                <Animated.View
+                  style={[styles.listContainer, { opacity: listOpacity }]}
+                >
                   {FOODS.map((food) => {
                     const isSelected = selected.includes(food.id);
                     return (
@@ -132,9 +169,14 @@ export default function Landing13() {
               </View>
 
               {/* ── Next Button ── */}
-              <Animated.View style={[styles.buttonContainer, { opacity: buttonOpacity }]}>
+              <Animated.View
+                style={[styles.buttonContainer, { opacity: buttonOpacity }]}
+              >
                 <TouchableOpacity
-                  style={[styles.button, selected.length === 0 && styles.buttonDisabled]}
+                  style={[
+                    styles.button,
+                    selected.length === 0 && styles.buttonDisabled,
+                  ]}
                   onPress={() => {
                     if (selected.length > 0) {
                       router.push({
@@ -148,7 +190,6 @@ export default function Landing13() {
                   <Text style={styles.buttonText}>Next</Text>
                 </TouchableOpacity>
               </Animated.View>
-
             </View>
           </TouchableWithoutFeedback>
         </ScrollView>
@@ -167,6 +208,13 @@ const styles = StyleSheet.create({
   innerContainer: {
     flex: 1,
     justifyContent: "space-between",
+  },
+  backButton: {
+    position: "absolute",
+    top: 60,
+    left: 16,
+    zIndex: 10,
+    padding: 8,
   },
   content: {
     flex: 1,

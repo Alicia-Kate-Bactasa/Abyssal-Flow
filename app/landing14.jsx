@@ -1,16 +1,17 @@
 import WaveBackground from "@/components/WaveBackground";
 import { LinearGradient } from "expo-linear-gradient";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter, usePathname } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useRef } from "react";
 import {
-    Animated,
-    Dimensions,
-    Platform,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Animated,
+  Dimensions,
+  Platform,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 const { height, width } = Dimensions.get("window");
@@ -25,9 +26,18 @@ const WaterIcon = () => {
     const animateWave = (anim, delay) =>
       Animated.loop(
         Animated.sequence([
-          Animated.timing(anim, { toValue: 6, duration: 800, delay, useNativeDriver: true }),
-          Animated.timing(anim, { toValue: 0, duration: 800, useNativeDriver: true }),
-        ])
+          Animated.timing(anim, {
+            toValue: 6,
+            duration: 800,
+            delay,
+            useNativeDriver: true,
+          }),
+          Animated.timing(anim, {
+            toValue: 0,
+            duration: 800,
+            useNativeDriver: true,
+          }),
+        ]),
       );
 
     animateWave(wave1, 0).start();
@@ -52,6 +62,7 @@ const WaterIcon = () => {
 
 export default function Landing14() {
   const router = useRouter();
+  const pathname = usePathname();
   const params = useLocalSearchParams();
 
   const titleOpacity = useRef(new Animated.Value(0)).current;
@@ -62,13 +73,33 @@ export default function Landing14() {
 
   useEffect(() => {
     Animated.stagger(150, [
-      Animated.timing(iconOpacity, { toValue: 1, duration: 600, useNativeDriver: true }),
+      Animated.timing(iconOpacity, {
+        toValue: 1,
+        duration: 600,
+        useNativeDriver: true,
+      }),
       Animated.parallel([
-        Animated.timing(titleOpacity, { toValue: 1, duration: 600, useNativeDriver: true }),
-        Animated.timing(titleY, { toValue: 0, duration: 600, useNativeDriver: true }),
+        Animated.timing(titleOpacity, {
+          toValue: 1,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+        Animated.timing(titleY, {
+          toValue: 0,
+          duration: 600,
+          useNativeDriver: true,
+        }),
       ]),
-      Animated.timing(subtitleOpacity, { toValue: 1, duration: 500, useNativeDriver: true }),
-      Animated.timing(buttonOpacity, { toValue: 1, duration: 500, useNativeDriver: true }),
+      Animated.timing(subtitleOpacity, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+      Animated.timing(buttonOpacity, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }),
     ]).start();
   }, []);
 
@@ -79,16 +110,18 @@ export default function Landing14() {
       end={{ x: 0, y: 1 }}
       style={styles.gradient}
     >
+      <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+        <Ionicons name="chevron-back" size={28} color="#FFFFFF" />
+      </TouchableOpacity>
+
       <StatusBar barStyle="light-content" />
 
       {/* ── Background ── */}
       <WaveBackground />
 
       <View style={styles.innerContainer}>
-
         {/* ── Content ── */}
         <View style={styles.content}>
-
           {/* Water icon */}
           <Animated.View style={[styles.iconWrapper, { opacity: iconOpacity }]}>
             <WaterIcon />
@@ -96,20 +129,27 @@ export default function Landing14() {
 
           {/* Title */}
           <Animated.Text
-            style={[styles.title, { opacity: titleOpacity, transform: [{ translateY: titleY }] }]}
+            style={[
+              styles.title,
+              { opacity: titleOpacity, transform: [{ translateY: titleY }] },
+            ]}
           >
             Predicting Your Flow...
           </Animated.Text>
 
           {/* Subtitle */}
-          <Animated.Text style={[styles.subtitle, { opacity: subtitleOpacity }]}>
-            We are analyzing your history and symptoms to map out your next cycle.
+          <Animated.Text
+            style={[styles.subtitle, { opacity: subtitleOpacity }]}
+          >
+            We are analyzing your history and symptoms to map out your next
+            cycle.
           </Animated.Text>
-
         </View>
 
         {/* ── Next Button ── */}
-        <Animated.View style={[styles.buttonContainer, { opacity: buttonOpacity }]}>
+        <Animated.View
+          style={[styles.buttonContainer, { opacity: buttonOpacity }]}
+        >
           <TouchableOpacity
             style={styles.button}
             onPress={() => {
@@ -120,7 +160,6 @@ export default function Landing14() {
             <Text style={styles.buttonText}>Next</Text>
           </TouchableOpacity>
         </Animated.View>
-
       </View>
     </LinearGradient>
   );
@@ -133,6 +172,13 @@ const styles = StyleSheet.create({
   innerContainer: {
     flex: 1,
     justifyContent: "space-between",
+  },
+  backButton: {
+    position: "absolute",
+    top: 60,
+    left: 16,
+    zIndex: 10,
+    padding: 8,
   },
   content: {
     flex: 1,
