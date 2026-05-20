@@ -1,9 +1,9 @@
 import { OceanColors } from '@/constants/theme';
 import { MaterialIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
-    Dimensions,
     KeyboardAvoidingView,
     Platform,
     ScrollView,
@@ -13,8 +13,6 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
-
-const { width, height } = Dimensions.get('window');
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -29,7 +27,7 @@ export default function LoginScreen() {
       // TODO: Implement actual login logic
       console.log('Login:', { email, password });
       // After successful login, navigate to main app
-      router.replace('/(tabs)');
+      router.replace('/dashboard');
     } catch (error) {
       console.error('Login error:', error);
     } finally {
@@ -42,15 +40,19 @@ export default function LoginScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
+    <LinearGradient
+      colors={['#041539', '#26466D']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 0, y: 1 }}
+      style={styles.gradient}
     >
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {/* Gradient-like background view */}
-        <View style={styles.backgroundGradient} />
-
-        <View style={styles.content}>
+      <View style={styles.blurOverlay} pointerEvents="none" />
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.container}
+      >
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          <View style={styles.content}>
           {/* Logo/Brand Section */}
           <View style={styles.logoSection}>
             <View style={styles.logo}>
@@ -120,23 +122,26 @@ export default function LoginScreen() {
             </TouchableOpacity>
           </View>
         </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
+  gradient: {
+    flex: 1,
+  },
+  blurOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(4, 21, 57, 0.18)',
+  },
   container: {
     flex: 1,
-    backgroundColor: OceanColors.deepBlue,
   },
   scrollContent: {
     flexGrow: 1,
     justifyContent: 'center',
-  },
-  backgroundGradient: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: OceanColors.deepBlue,
   },
   content: {
     paddingHorizontal: 24,
@@ -179,7 +184,6 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     color: OceanColors.inputText,
-    outlineStyle: 'none',
   },
   forgotPasswordContainer: {
     alignItems: 'flex-end',

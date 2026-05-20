@@ -1,17 +1,18 @@
-import { useRouter, useLocalSearchParams } from "expo-router";
-import React, { useState, useRef, useEffect } from "react";
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  Dimensions,
-  Animated,
-  StatusBar,
-  Platform,
-  FlatList,
-} from "react-native";
 import WaveBackground from "@/components/WaveBackground";
+import { LinearGradient } from "expo-linear-gradient";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { useEffect, useRef, useState } from "react";
+import {
+    Animated,
+    Dimensions,
+    FlatList,
+    Platform,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
+} from "react-native";
 
 const { height } = Dimensions.get("window");
 
@@ -72,7 +73,12 @@ export default function Landing9() {
   };
 
   return (
-    <View style={styles.gradient}>
+    <LinearGradient
+      colors={["#041539", "#26466D"]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 0, y: 1 }}
+      style={styles.gradient}
+    >
       <StatusBar barStyle="light-content" />
 
       {/* ── Background ── */}
@@ -140,7 +146,7 @@ export default function Landing9() {
           </Animated.View>
 
         </View>
-    </View>
+    </LinearGradient>
   );
 }
 

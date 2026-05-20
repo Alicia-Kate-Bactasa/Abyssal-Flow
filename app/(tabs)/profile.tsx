@@ -1,11 +1,37 @@
 import { LinearGradient } from "expo-linear-gradient";
-import React from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { useRouter } from "expo-router";
+import React, { useState } from "react";
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function ProfileScreen() {
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const [description, setDescription] = useState("");
+
+  const handleLogout = () => {
+    router.replace("/auth/login");
+  };
+
+  const handleActionPress = (label: string) => {
+    console.log("Profile action:", label);
+  };
+
   return (
     <LinearGradient colors={["#061736", "#1E3A78"]} style={styles.container}>
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.content,
+          { paddingTop: 24 + insets.top, paddingBottom: 140 + insets.bottom },
+        ]}
+      >
         <View style={styles.avatarWrapper}>
           <View style={styles.avatarCircle}>
             <Text style={styles.avatarIcon}>👤</Text>
@@ -17,17 +43,40 @@ export default function ProfileScreen() {
 
         <Text style={styles.name}>Ishie Boo</Text>
         <Text style={styles.sectionLabel}>Description:</Text>
-        <View style={styles.descriptionBox} />
+        <TextInput
+          style={styles.descriptionBox}
+          placeholder="Share a little about yourself..."
+          placeholderTextColor="rgba(255,255,255,0.5)"
+          multiline
+          value={description}
+          onChangeText={setDescription}
+        />
 
-        {Array.from({ length: 4 }, (_, index) => (
-          <View key={index} style={styles.actionButton}>
-            <Text style={styles.actionText}>Edit Information</Text>
-          </View>
-        ))}
+        {Array.from({ length: 4 }, (_, index) => {
+          const label = "Edit Information";
+          return (
+            <Pressable
+              key={`${label}-${index}`}
+              onPress={() => handleActionPress(label)}
+              style={({ pressed }) => [
+                styles.actionButton,
+                pressed && styles.actionButtonPressed,
+              ]}
+            >
+              <Text style={styles.actionText}>{label}</Text>
+            </Pressable>
+          );
+        })}
 
-        <View style={styles.logoutButton}>
+        <Pressable
+          onPress={handleLogout}
+          style={({ pressed }) => [
+            styles.logoutButton,
+            pressed && styles.actionButtonPressed,
+          ]}
+        >
           <Text style={styles.actionText}>Log out</Text>
-        </View>
+        </Pressable>
       </ScrollView>
     </LinearGradient>
   );
@@ -36,9 +85,8 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   content: {
-    padding: 24,
+    paddingHorizontal: 24,
     alignItems: "center",
-    paddingBottom: 140,
   },
   avatarWrapper: {
     marginTop: 12,
@@ -82,6 +130,9 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     backgroundColor: "rgba(19,33,75,0.7)",
     marginBottom: 18,
+    padding: 12,
+    color: "#FFFFFF",
+    textAlignVertical: "top",
   },
   actionButton: {
     width: "100%",
@@ -91,6 +142,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 12,
+  },
+  actionButtonPressed: {
+    opacity: 0.7,
   },
   logoutButton: {
     width: "100%",

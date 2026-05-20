@@ -1,21 +1,22 @@
 // app/(tabs)/_layout.tsx
+import { CycleDataProvider, useCycleData } from "@/hooks/use-cycle-store";
+import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import {
-  View,
-  StyleSheet,
   Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
   TouchableOpacity,
   TouchableWithoutFeedback,
-  Text,
-  Pressable,
-  Platform,
+  View
 } from "react-native";
-import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 
 // ─── Colours ──────────────────────────────────────────────────────────────────
 const C = {
-  bar: "#001242",
+  bar: "rgba(0, 23, 83, 0.65)",
   activeCircle: "#2A5CA8",
   icon: "#FFFFFF",
   inactiveDim: "rgba(255,255,255,0.55)",
@@ -23,7 +24,6 @@ const C = {
   periodRed: "#D93025",
   periodRedTranslucent: "rgba(217, 48, 37, 0.25)", // New translucent highlight
   symptomBlue: "#0E2D5A",
-  symptomIcon: "#4A90D9",
   caret: "#071A3E",
 };
 
@@ -203,67 +203,34 @@ function CalendarSection({
   );
 }
 
-// ─── Symptoms ─────────────────────────────────────────────────────────────────
-type Symptom = {
-  label: string;
-  icon: React.ComponentProps<typeof MaterialCommunityIcons>["name"];
-};
-const SYMPTOMS: Symptom[] = [
-  { label: "flirty", icon: "emoticon-wink-outline" },
-  { label: "sad", icon: "emoticon-cry-outline" },
-  { label: "angry", icon: "emoticon-angry-outline" },
-  { label: "happy", icon: "emoticon-happy-outline" },
-  { label: "hungry", icon: "food-fork-drink" },
+// ─── Mood & Symptom Logging ──────────────────────────────────────────────────
+const MOODS = [
+  "Happy",
+  "Sad",
+  "Sensitive",
+  "Angry",
+  "Calm",
+  "Anxious",
+  "Energetic",
+  "Apathetic",
 ];
 
-function SymptomsSection() {
-  const [selected, setSelected] = useState<string | null>(null);
-  const toggle = (label: string) =>
-    setSelected((s) => (s === label ? null : label));
-
-  // Fix: Properly split the array so it doesn't render all 5 items twice!
-  const chunkedSymptoms = [
-    SYMPTOMS.slice(0, 3), // Row 1: First 3
-    SYMPTOMS.slice(3, 5), // Row 2: Last 2
-  ];
-
-  return (
-    <View style={styles.sympSection}>
-      <Text style={styles.sectionHeader}>Log Mood/Symptoms</Text>
-      {chunkedSymptoms.map((rowItems, rowIdx) => (
-        <View key={rowIdx} style={styles.sympRow}>
-          {rowItems.map((s) => {
-            const active = selected === s.label;
-            return (
-              <Pressable
-                key={s.label}
-                style={styles.sympItem}
-                onPress={() => toggle(s.label)} // Fix: Now completely clickable!
-              >
-                <View
-                  style={[styles.sympCircle, active && styles.sympCircleActive]}
-                >
-                  <MaterialCommunityIcons
-                    name={s.icon}
-                    size={26}
-                    color={active ? C.bar : C.symptomIcon}
-                  />
-                </View>
-                <Text style={styles.sympLabel}>{s.label}</Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      ))}
-    </View>
-  );
-}
+const SYMPTOMS = [
+  "Cramps",
+  "Bloating",
+  "Headache",
+  "Acne",
+  "Backache",
+  "Tender Breasts",
+  "Nausea",
+  "Fatigue",
+  "Cravings",
+];
 
 // ─── Add Modal ────────────────────────────────────────────────────────────────
 const TODAY = new Date();
 const INITIAL_YEAR = TODAY.getFullYear();
 const INITIAL_MONTH = TODAY.getMonth();
-const INITIAL_PERIOD_DAYS = [17, 18, 19, 20]; // Mock predicted days for the current month
 
 function AddModal({
   visible,
@@ -272,46 +239,50 @@ function AddModal({
   visible: boolean;
   onClose: () => void;
 }) {
+  const {
+    getPeriodDaysForMonth,
+    getPredictedDaysForMonth,
+    setPeriodDatesForMonth,
+    recalcPredictions,
+    logMoodSymptoms,
+  } = useCycleData();
   const [viewYear, setViewYear] = useState(INITIAL_YEAR);
   const [viewMonth, setViewMonth] = useState(INITIAL_MONTH);
+  const [draftDays, setDraftDays] = useState<number[]>([]);
+  const [savedDays, setSavedDays] = useState<number[]>([]);
+  const [selectedMoods, setSelectedMoods] = useState<string[]>([]);
+  const [selectedSymptoms, setSelectedSymptoms] = useState<string[]>([]);
 
   useEffect(() => {
     if (visible) {
       const today = new Date();
       setViewYear(today.getFullYear());
       setViewMonth(today.getMonth());
+      setSelectedMoods([]);
+      setSelectedSymptoms([]);
     }
   }, [visible]);
 
-  const [selectionMap, setSelectionMap] = useState<Record<string, number[]>>({
-    [`${INITIAL_YEAR}-${INITIAL_MONTH}`]: [...INITIAL_PERIOD_DAYS],
-  });
-  const [savedMap, setSavedMap] = useState<Record<string, number[]>>({
-    [`${INITIAL_YEAR}-${INITIAL_MONTH}`]: [...INITIAL_PERIOD_DAYS],
-  });
+  useEffect(() => {
+    if (!visible) return;
+    const days = getPeriodDaysForMonth(viewYear, viewMonth);
+    setDraftDays(days);
+    setSavedDays(days);
+  }, [visible, viewMonth, viewYear, getPeriodDaysForMonth]);
 
-  const monthKey = `${viewYear}-${viewMonth}`;
-  const selectedDays = selectionMap[monthKey] ?? [];
-  const savedDays = savedMap[monthKey] ?? [];
-
-  // We identify the initial predictions strictly for the default mock month
-  const isCurrentOrFutureMonth =
-    viewYear > INITIAL_YEAR ||
-    (viewYear === INITIAL_YEAR && viewMonth >= INITIAL_MONTH);
-  const predictedDays = isCurrentOrFutureMonth ? INITIAL_PERIOD_DAYS : [];
+  const predictedDays = getPredictedDaysForMonth(viewYear, viewMonth);
 
   const hasChanges =
-    JSON.stringify([...selectedDays].sort()) !==
+    JSON.stringify([...draftDays].sort()) !==
     JSON.stringify([...savedDays].sort());
 
+  const hasLogSelection =
+    selectedMoods.length > 0 || selectedSymptoms.length > 0;
+
   const handleToggleDay = (day: number) => {
-    setSelectionMap((prev) => {
-      const current = prev[monthKey] ?? [];
-      const next = current.includes(day)
-        ? current.filter((d) => d !== day)
-        : [...current, day];
-      return { ...prev, [monthKey]: next };
-    });
+    setDraftDays((prev) =>
+      prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day],
+    );
   };
 
   const handlePrevMonth = () => {
@@ -329,12 +300,31 @@ function AddModal({
   };
 
   const handleSave = () => {
-    setSavedMap((prev) => ({ ...prev, [monthKey]: [...selectedDays] }));
+    setPeriodDatesForMonth(viewYear, viewMonth, draftDays);
+    recalcPredictions();
+    setSavedDays(draftDays);
     onClose();
   };
 
   const handleClose = () => {
-    setSelectionMap(savedMap); // reset unsaved tweaks
+    setDraftDays(savedDays);
+    onClose();
+  };
+
+  const toggleSelected = (
+    value: string,
+    setSelected: React.Dispatch<React.SetStateAction<string[]>>,
+  ) => {
+    setSelected((prev) =>
+      prev.includes(value) ? prev.filter((item) => item !== value) : [...prev, value],
+    );
+  };
+
+  const handleLog = () => {
+    const today = new Date();
+    logMoodSymptoms(today, selectedMoods, selectedSymptoms);
+    setSelectedMoods([]);
+    setSelectedSymptoms([]);
     onClose();
   };
 
@@ -356,7 +346,7 @@ function AddModal({
         <CalendarSection
           year={viewYear}
           month={viewMonth}
-          selectedDays={selectedDays}
+          selectedDays={draftDays}
           predictedDays={predictedDays}
           hasChanges={hasChanges}
           onToggleDay={handleToggleDay}
@@ -382,7 +372,64 @@ function AddModal({
         </Pressable>
 
         <View style={styles.divider} />
-        <SymptomsSection />
+        <View style={styles.logSection}>
+          <Text style={styles.sectionHeader}>Moods</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.logRow}
+          >
+            {MOODS.map((mood) => {
+              const active = selectedMoods.includes(mood);
+              return (
+                <Pressable
+                  key={mood}
+                  style={[styles.logCircle, active && styles.logCircleActive]}
+                  onPress={() => toggleSelected(mood, setSelectedMoods)}
+                >
+                  <Text style={[styles.logText, active && styles.logTextActive]}>
+                    {mood.slice(0, 2).toUpperCase()}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+
+          <Text style={styles.sectionHeader}>Symptoms</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.logRow}
+          >
+            {SYMPTOMS.map((symptom) => {
+              const active = selectedSymptoms.includes(symptom);
+              return (
+                <Pressable
+                  key={symptom}
+                  style={[styles.logCircle, active && styles.logCircleActive]}
+                  onPress={() => toggleSelected(symptom, setSelectedSymptoms)}
+                >
+                  <Text style={[styles.logText, active && styles.logTextActive]}>
+                    {symptom
+                      .split(" ")
+                      .map((word) => word[0])
+                      .join("")
+                      .toUpperCase()}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+
+          <Pressable
+            onPress={hasLogSelection ? handleLog : undefined}
+            style={[styles.logBtn, !hasLogSelection && styles.logBtnDim]}
+          >
+            <Text style={[styles.logBtnText, !hasLogSelection && styles.logBtnTextDim]}>
+              Log
+            </Text>
+          </Pressable>
+        </View>
         <View style={styles.caretShape} />
       </View>
     </Modal>
@@ -394,7 +441,7 @@ export default function TabLayout() {
   const [modalOpen, setModalOpen] = useState(false);
 
   return (
-    <>
+    <CycleDataProvider>
       <Tabs
         screenOptions={{
           headerShown: false,
@@ -461,7 +508,7 @@ export default function TabLayout() {
         />
       </Tabs>
       <AddModal visible={modalOpen} onClose={() => setModalOpen(false)} />
-    </>
+    </CycleDataProvider>
   );
 }
 
@@ -473,11 +520,11 @@ const styles = StyleSheet.create({
   tabBar: {
     position: "absolute",
     bottom: TAB_BAR_BOTTOM,
-    left: 25,
-    right: 25,
+    left: "8%",
+    right: "8%",
     height: TAB_BAR_HEIGHT,
     backgroundColor: C.bar,
-    borderRadius: 40,
+    borderRadius: 50,
     borderTopWidth: 0,
     paddingBottom: 0,
     paddingTop: 0,
@@ -626,14 +673,14 @@ const styles = StyleSheet.create({
     marginVertical: 14,
     marginHorizontal: 4,
   },
-  sympSection: { marginBottom: 4 },
-  sympRow: {
+  logSection: { marginBottom: 4 },
+  logRow: {
     flexDirection: "row",
-    justifyContent: "space-around",
-    marginTop: 10,
+    gap: 10,
+    paddingHorizontal: 4,
+    paddingBottom: 12,
   },
-  sympItem: { alignItems: "center", gap: 5 },
-  sympCircle: {
+  logCircle: {
     width: 48,
     height: 48,
     borderRadius: 24,
@@ -643,13 +690,29 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(74,144,217,0.3)",
   },
-  sympCircleActive: { backgroundColor: "#64B5F6", borderColor: "#64B5F6" },
-  sympLabel: {
-    color: "#7A9DBF",
-    fontSize: 10,
-    textAlign: "center",
-    letterSpacing: 0.2,
+  logCircleActive: { backgroundColor: "#64B5F6", borderColor: "#64B5F6" },
+  logText: {
+    color: "#C8D8EC",
+    fontSize: 11,
+    fontWeight: "600",
+    letterSpacing: 0.6,
   },
+  logTextActive: { color: "#001753" },
+  logBtn: {
+    marginTop: 4,
+    backgroundColor: "#123A6C",
+    borderRadius: 16,
+    paddingVertical: 10,
+    alignItems: "center",
+  },
+  logBtnDim: { opacity: 0.5 },
+  logBtnText: {
+    color: "#E8F4FF",
+    fontSize: 12,
+    fontWeight: "600",
+    letterSpacing: 0.6,
+  },
+  logBtnTextDim: { color: "#6F8FB0" },
   saveBtn: {
     flexDirection: "row",
     alignItems: "center",

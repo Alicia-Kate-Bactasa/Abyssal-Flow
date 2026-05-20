@@ -40,7 +40,7 @@ type PhaseConfig = {
   description: string;
   moonColor: string;
   waveColors: [string, string];
-  wavePath: string;
+  wavePoints: [number, number, number, number, number, number, number];
 };
 
 const getCycleDay = (day: number) => ((day - 1) % CYCLE_LENGTH) + 1;
@@ -51,6 +51,56 @@ const getPhaseKey = (cycleDay: number): PhaseKey => {
   if (cycleDay <= 17) return "ovulation";
   return "luteal";
 };
+
+const PHASE_ORDER: PhaseKey[] = [
+  "menstrual",
+  "follicular",
+  "ovulation",
+  "luteal",
+];
+
+const PHASE_RANGES: Record<PhaseKey, [number, number]> = {
+  menstrual: [1, 5],
+  follicular: [6, 13],
+  ovulation: [14, 17],
+  luteal: [18, 28],
+};
+
+const getNextPhaseRange = (cycleDay: number) => {
+  const current = getPhaseKey(cycleDay);
+  const nextIndex = (PHASE_ORDER.indexOf(current) + 1) % PHASE_ORDER.length;
+  const nextKey = PHASE_ORDER[nextIndex];
+  return { key: nextKey, range: PHASE_RANGES[nextKey] };
+};
+
+const WAVE_X = {
+  c1: width * 0.2,
+  c2: width * 0.4,
+  mid: width * 0.55,
+  c3: width * 0.7,
+  c4: width * 0.88,
+};
+
+const buildWavePath = (
+  points: [number, number, number, number, number, number, number],
+) => {
+  const [startY, c1y, c2y, midY, c3y, c4y, endY] = points;
+  return `
+    M 0, ${startY}
+    C ${WAVE_X.c1}, ${c1y} ${WAVE_X.c2}, ${c2y} ${WAVE_X.mid}, ${midY}
+    C ${WAVE_X.c3}, ${c3y} ${WAVE_X.c4}, ${c4y} ${width}, ${endY}
+    L ${width}, 180
+    L 0, 180
+    Z
+  `;
+};
+
+const interpolateWavePoints = (
+  from: [number, number, number, number, number, number, number],
+  to: [number, number, number, number, number, number, number],
+  t: number,
+) => from.map((value, index) => value + (to[index] - value) * t) as
+  [number, number, number, number, number, number, number];
 
 const PHASES: Record<PhaseKey, PhaseConfig> = {
   menstrual: {
@@ -63,14 +113,7 @@ const PHASES: Record<PhaseKey, PhaseConfig> = {
       "The ocean turns stormy and deep. Your body is shedding and resetting with quiet intensity. Rest and go gently.",
     moonColor: "#FFFFFF",
     waveColors: ["#001958", "#001047"],
-    wavePath: `
-      M 0, 110
-      C ${width * 0.18}, 30 ${width * 0.36}, 210 ${width * 0.55}, 120
-      C ${width * 0.7}, 40 ${width * 0.86}, 200 ${width}, 110
-      L ${width}, 180
-      L 0, 180
-      Z
-    `,
+    wavePoints: [110, 30, 210, 120, 40, 200, 110],
   },
   follicular: {
     key: "follicular",
@@ -82,14 +125,7 @@ const PHASES: Record<PhaseKey, PhaseConfig> = {
       "Warm light returns to the water as your energy gently rebuilds. A quiet sense of renewal begins to rise.",
     moonColor: "#FFD768",
     waveColors: ["#FFB86A", "#FF8A7C"],
-    wavePath: `
-      M 0, 132
-      C ${width * 0.2}, 124 ${width * 0.35}, 140 ${width * 0.5}, 130
-      C ${width * 0.65}, 120 ${width * 0.8}, 138 ${width}, 132
-      L ${width}, 180
-      L 0, 180
-      Z
-    `,
+    wavePoints: [132, 124, 140, 130, 120, 138, 132],
   },
   ovulation: {
     key: "ovulation",
@@ -101,14 +137,7 @@ const PHASES: Record<PhaseKey, PhaseConfig> = {
       "The ocean is bright and open under full light. Energy peaks and everything feels more alive and connected. Step into your energy.",
     moonColor: "#FFE79A",
     waveColors: ["#6CC4FF", "#49A9E6"],
-    wavePath: `
-      M 0, 134
-      C ${width * 0.25}, 126 ${width * 0.4}, 140 ${width * 0.55}, 132
-      C ${width * 0.7}, 124 ${width * 0.85}, 138 ${width}, 134
-      L ${width}, 180
-      L 0, 180
-      Z
-    `,
+    wavePoints: [134, 126, 140, 132, 124, 138, 134],
   },
   luteal: {
     key: "luteal",
@@ -120,14 +149,7 @@ const PHASES: Record<PhaseKey, PhaseConfig> = {
       "The ocean deepens under fading light. Your energy slows as your body prepares to reset. Take things gently today.",
     moonColor: "#FFFFFF",
     waveColors: ["#1E5E8F", "#0B3B5E"],
-    wavePath: `
-      M 0, 120
-      C ${width * 0.22}, 80 ${width * 0.5}, 170 ${width * 0.74}, 120
-      C ${width * 0.86}, 95 ${width * 0.94}, 140 ${width}, 120
-      L ${width}, 180
-      L 0, 180
-      Z
-    `,
+    wavePoints: [120, 80, 170, 120, 95, 140, 120],
   },
 };
 
@@ -137,11 +159,15 @@ const PHASES: Record<PhaseKey, PhaseConfig> = {
 const CircularCalendarDial = ({
   onDayChange,
   onDateChange,
-  phase,
+  activeDay,
+  moonColor,
+  anchorCycleDay,
 }: {
   onDayChange: (day: number) => void;
   onDateChange: (date: Date) => void;
-  phase: PhaseConfig;
+  activeDay: number;
+  moonColor: string;
+  anchorCycleDay: number;
 }) => {
   const [viewDate, setViewDate] = useState(new Date());
 
@@ -159,9 +185,7 @@ const CircularCalendarDial = ({
     ? -(currentDay - 1) * angleSlice
     : 0;
 
-  const rotationAngle = useRef(
-    new Animated.Value(initialRotationAngle),
-  ).current;
+  const rotationAngle = useRef(new Animated.Value(initialRotationAngle)).current;
   const currentAngleRef = useRef(initialRotationAngle);
 
   
@@ -174,10 +198,66 @@ const CircularCalendarDial = ({
     onDateChange(viewDate);
   }, [onDateChange, viewDate]);
 
+  const normalizeAngleToMonth = useCallback(
+    (value: number) => {
+      let nextYear = currentYear;
+      let nextMonth = currentMonth;
+      let nextDays = new Date(currentYear, currentMonth + 1, 0).getDate();
+      let nextSlice = 360 / nextDays;
+      let tick = Math.round(-value / nextSlice);
+
+      while (tick >= nextDays) {
+        tick -= nextDays;
+        nextMonth += 1;
+        if (nextMonth > 11) {
+          nextMonth = 0;
+          nextYear += 1;
+        }
+        nextDays = new Date(nextYear, nextMonth + 1, 0).getDate();
+        nextSlice = 360 / nextDays;
+        value = -tick * nextSlice;
+      }
+
+      while (tick < 0) {
+        nextMonth -= 1;
+        if (nextMonth < 0) {
+          nextMonth = 11;
+          nextYear -= 1;
+        }
+        nextDays = new Date(nextYear, nextMonth + 1, 0).getDate();
+        nextSlice = 360 / nextDays;
+        tick += nextDays;
+        value = -tick * nextSlice;
+      }
+
+      return {
+        year: nextYear,
+        month: nextMonth,
+        dayIndex: tick,
+        angle: value,
+      };
+    },
+    [currentMonth, currentYear],
+  );
+
   useEffect(() => {
     const id = rotationAngle.addListener(({ value }) => {
-      currentAngleRef.current = value;
+      const normalized = normalizeAngleToMonth(value);
+      if (
+        normalized.month !== currentMonth ||
+        normalized.year !== currentYear
+      ) {
+        setViewDate(new Date(normalized.year, normalized.month, 1));
+        rotationAngle.setValue(normalized.angle);
+        currentAngleRef.current = normalized.angle;
+        lastTickRef.current = normalized.dayIndex;
+        const liveDay = normalized.dayIndex + 1;
+        onDayChange(liveDay);
+        onDateChange(new Date(normalized.year, normalized.month, liveDay));
+        return;
+      }
 
+      currentAngleRef.current = value;
       const tick = Math.round(-value / angleSlice);
       if (tick !== lastTickRef.current) {
         lastTickRef.current = tick;
@@ -195,6 +275,7 @@ const CircularCalendarDial = ({
     currentMonth,
     currentYear,
     daysInMonth,
+    normalizeAngleToMonth,
     onDateChange,
     onDayChange,
     rotationAngle,
@@ -236,18 +317,15 @@ const CircularCalendarDial = ({
         friction: 10,
       }).start(({ finished }) => {
         if (finished) {
-          const landedIndex = Math.round(-snapped / angleSlice);
-          if (landedIndex >= daysInMonth) {
-            const nextDate = new Date(currentYear, currentMonth + 1, 1);
-            setViewDate(nextDate);
-            onDateChange(nextDate);
-            rotationAngle.setValue(0);
-          } else if (landedIndex < 0) {
-            const prevDays = new Date(currentYear, currentMonth, 0).getDate();
-            const prevDate = new Date(currentYear, currentMonth - 1, 1);
-            setViewDate(prevDate);
-            onDateChange(prevDate);
-            rotationAngle.setValue(-(prevDays - 1) * (360 / prevDays));
+          const normalized = normalizeAngleToMonth(snapped);
+          if (
+            normalized.month !== currentMonth ||
+            normalized.year !== currentYear
+          ) {
+            setViewDate(new Date(normalized.year, normalized.month, 1));
+            onDateChange(new Date(normalized.year, normalized.month, 1));
+            rotationAngle.setValue(normalized.angle);
+            currentAngleRef.current = normalized.angle;
           }
           startInactivityTimer();
         }
@@ -257,8 +335,8 @@ const CircularCalendarDial = ({
       angleSlice,
       currentMonth,
       currentYear,
-      daysInMonth,
       onDateChange,
+      normalizeAngleToMonth,
       rotationAngle,
       startInactivityTimer,
     ],
@@ -351,6 +429,7 @@ const CircularCalendarDial = ({
 
   const generateDayElements = () => {
     const days = [];
+    const nextPhase = getNextPhaseRange(anchorCycleDay);
     for (let day = 1; day <= daysInMonth; day++) {
       const angle = (day - 1) * angleSlice - 90;
       const radians = (angle * Math.PI) / 180;
@@ -359,6 +438,10 @@ const CircularCalendarDial = ({
 
       const dateForDay = new Date(currentYear, currentMonth, day);
       const dayName = WEEKDAYS[dateForDay.getDay()];
+      const cycleDay = getCycleDay(day);
+      const isNextPhaseDay =
+        cycleDay >= nextPhase.range[0] && cycleDay <= nextPhase.range[1];
+      const isActiveDay = day === activeDay;
 
       days.push(
         <View
@@ -379,6 +462,9 @@ const CircularCalendarDial = ({
           <Text style={styles.weekdayLabel}>{dayName}</Text>
           <View style={styles.dayNumberCircle}>
             <Text style={styles.dayNumberText}>{day}</Text>
+            {isNextPhaseDay && !isActiveDay ? (
+              <View style={styles.nextPhaseMarker} />
+            ) : null}
           </View>
         </View>,
       );
@@ -409,7 +495,7 @@ const CircularCalendarDial = ({
         style={[
           styles.moonGlowCore,
           {
-            backgroundColor: phase.moonColor,
+              backgroundColor: moonColor,
             top: (WRAPPER_SIZE - MOON_SIZE) / 2 + MOON_INSET,
             left: (WRAPPER_SIZE - MOON_SIZE) / 2,
           },
@@ -444,12 +530,14 @@ export default function Dashboard() {
   const phaseKey = getPhaseKey(cycleDay);
   const phase = PHASES[phaseKey];
   const daysUntilPeriod = CYCLE_LENGTH - cycleDay + 1;
+  const anchorCycleDayRef = useRef(getCycleDay(new Date().getDate()));
 
   const [previousPhaseKey, setPreviousPhaseKey] = useState<PhaseKey>(phaseKey);
   const fadeAnim = useRef(new Animated.Value(1)).current;
-  const waveFadeAnim = useRef(new Animated.Value(1)).current;
   const waveMorphAnim = useRef(new Animated.Value(1)).current;
-  const [waveTransitioning, setWaveTransitioning] = useState(false);
+  const waveFromRef = useRef(phase.wavePoints);
+  const waveToRef = useRef(phase.wavePoints);
+  const [wavePath, setWavePath] = useState(buildWavePath(phase.wavePoints));
 
   useEffect(() => {
     if (phaseKey !== previousPhaseKey) {
@@ -461,32 +549,34 @@ export default function Dashboard() {
       }).start(() => {
         setPreviousPhaseKey(phaseKey);
       });
-      setWaveTransitioning(true);
-      waveFadeAnim.setValue(0);
-      Animated.timing(waveFadeAnim, {
-        toValue: 1,
-        duration: 650,
-        easing: Easing.inOut(Easing.cubic),
-        useNativeDriver: true,
-      }).start(({ finished }) => {
-        if (finished) setWaveTransitioning(false);
-      });
-
+      waveFromRef.current = PHASES[previousPhaseKey].wavePoints;
+      waveToRef.current = PHASES[phaseKey].wavePoints;
       waveMorphAnim.setValue(0);
       Animated.timing(waveMorphAnim, {
         toValue: 1,
         duration: 650,
         easing: Easing.inOut(Easing.cubic),
-        useNativeDriver: true,
+        useNativeDriver: false,
       }).start();
     }
   }, [
     fadeAnim,
     phaseKey,
     previousPhaseKey,
-    waveFadeAnim,
     waveMorphAnim,
   ]);
+
+  useEffect(() => {
+    const id = waveMorphAnim.addListener(({ value }) => {
+      const points = interpolateWavePoints(
+        waveFromRef.current,
+        waveToRef.current,
+        value,
+      );
+      setWavePath(buildWavePath(points));
+    });
+    return () => waveMorphAnim.removeListener(id);
+  }, [waveMorphAnim]);
 
   const previousPhase = PHASES[previousPhaseKey];
   const subGreetingText =
@@ -513,58 +603,17 @@ export default function Dashboard() {
         <CircularCalendarDial
           onDayChange={setActiveDay}
           onDateChange={setFooterDate}
-          phase={phase}
+          activeDay={activeDay}
+          moonColor={phase.moonColor}
+          anchorCycleDay={anchorCycleDayRef.current}
         />
       </View>
 
       <View style={styles.waveLayer} pointerEvents="none">
-        {waveTransitioning ? (
-          <Animated.View
-            style={{
-              opacity: waveFadeAnim.interpolate({
-                inputRange: [0, 1],
-                outputRange: [1, 0],
-              }),
-              transform: [
-                {
-                  translateX: waveMorphAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [-4, 0],
-                  }),
-                },
-              ],
-            }}
-          >
-            <Svg width={width} height={180} viewBox={`0 0 ${width} 180`}>
-              <Path
-                d={previousPhase.wavePath}
-                fill={previousPhase.waveColors[0]}
-              />
-            </Svg>
-            <LinearGradient colors={previousPhase.waveColors} style={styles.waveFill} />
-          </Animated.View>
-        ) : null}
-        <Animated.View
-          style={[
-            styles.waveOverlay,
-            {
-              transform: [
-                {
-                  translateX: waveMorphAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [-4, 0],
-                  }),
-                },
-              ],
-              opacity: waveFadeAnim,
-            },
-          ]}
-        >
-          <Svg width={width} height={180} viewBox={`0 0 ${width} 180`}>
-            <Path d={phase.wavePath} fill={phase.waveColors[0]} />
-          </Svg>
-          <LinearGradient colors={phase.waveColors} style={styles.waveFill} />
-        </Animated.View>
+        <Svg width={width} height={180} viewBox={`0 0 ${width} 180`}>
+          <Path d={wavePath} fill={phase.waveColors[0]} />
+        </Svg>
+        <LinearGradient colors={phase.waveColors} style={styles.waveFill} />
       </View>
 
       <View style={styles.contentOverlay} pointerEvents="box-none">
@@ -603,14 +652,12 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     top: height * 0.48,
+    bottom: 0,
     zIndex: 20,
   },
   waveFill: {
-    height: height * 0.38,
+    flex: 1,
     marginTop: -2,
-  },
-  waveOverlay: {
-    ...StyleSheet.absoluteFillObject,
   },
   moonWrapper: {
     ...StyleSheet.absoluteFillObject,
@@ -719,6 +766,14 @@ const styles = StyleSheet.create({
     borderRadius: 17,
     justifyContent: "center",
     alignItems: "center",
+  },
+  nextPhaseMarker: {
+    position: "absolute",
+    bottom: 1,
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "rgba(255,255,255,0.5)",
   },
   dayNumberText: {
     color: "white",

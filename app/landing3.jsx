@@ -1,21 +1,21 @@
-import { useRouter, useLocalSearchParams } from "expo-router";
-import React, { useRef, useEffect } from "react";
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  Dimensions,
-  Animated,
-  StatusBar,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  TouchableWithoutFeedback,
-  Keyboard,
-} from "react-native";
-import { Ionicons } from "@expo/vector-icons"; // Added for the back button
 import WaveBackground from "@/components/WaveBackground";
+import { LinearGradient } from "expo-linear-gradient";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { useEffect, useRef } from "react";
+import {
+    Animated,
+    Dimensions,
+    Keyboard,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    TouchableWithoutFeedback,
+    View,
+} from "react-native";
 
 const { height } = Dimensions.get("window");
 
@@ -57,7 +57,12 @@ export default function Landing3() {
   }, []);
 
   return (
-    <View style={styles.gradient}>
+    <LinearGradient
+      colors={["#041539", "#26466D"]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 0, y: 1 }}
+      style={styles.gradient}
+    >
       <StatusBar barStyle="light-content" />
 
       {/* ── Background ── */}
@@ -125,14 +130,13 @@ export default function Landing3() {
           </TouchableWithoutFeedback>
         </ScrollView>
       </KeyboardAvoidingView>
-    </View>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
   gradient: {
     flex: 1,
-    backgroundColor: "#000000", // Keeps the transparent issue fixed
   },
   scrollContainer: {
     flexGrow: 1,
