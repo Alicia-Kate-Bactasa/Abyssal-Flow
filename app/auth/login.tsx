@@ -6,6 +6,7 @@ import React, { useState } from 'react';
 import {
   Image,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   ScrollView,
   StyleSheet,
@@ -21,6 +22,7 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [forgotPasswordVisible, setForgotPasswordVisible] = useState(false);
 
   const handleLogin = async () => {
     setLoading(true);
@@ -38,6 +40,10 @@ export default function LoginScreen() {
 
   const handleSignupNavigation = () => {
     router.push('/auth/signup');
+  };
+
+  const handleForgotPassword = () => {
+    setForgotPasswordVisible(true);
   };
 
   return (
@@ -99,7 +105,7 @@ export default function LoginScreen() {
           </View>
 
           {/* Forgot Password Link */}
-          <TouchableOpacity activeOpacity={1} style={styles.forgotPasswordContainer}>
+          <TouchableOpacity activeOpacity={1} style={styles.forgotPasswordContainer} onPress={handleForgotPassword}>
             <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
           </TouchableOpacity>
 
@@ -123,6 +129,30 @@ export default function LoginScreen() {
         </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <Modal
+        transparent
+        visible={forgotPasswordVisible}
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => setForgotPasswordVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Reset Password</Text>
+            <Text style={styles.modalCopy}>
+              Enter your email and we will send a recovery link that matches the Abyssal Flow theme.
+            </Text>
+            <TouchableOpacity
+              activeOpacity={1}
+              style={styles.modalButton}
+              onPress={() => setForgotPasswordVisible(false)}
+            >
+              <Text style={styles.modalButtonText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -137,40 +167,41 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     justifyContent: 'flex-start',
-    paddingTop: 28,
+    paddingTop: 44,
   },
   content: {
     paddingHorizontal: 24,
-    paddingVertical: 24,
+    paddingTop: 36,
+    paddingBottom: 24,
     zIndex: 1,
   },
   logoSection: {
     alignItems: 'center',
     justifyContent: 'flex-start',
     width: '100%',
-    height: 194,
+    height: 160,
     marginBottom: 8,
     position: 'relative',
   },
   logoImage: {
-    width: 185,
-    height: 185,
+    width: 150,
+    height: 150,
     position: 'absolute',
     top: 0,
   },
   brandName: {
-    fontSize: 18,
+    fontSize: 16,
     fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
     color: OceanColors.textSecondary,
     letterSpacing: 1,
     position: 'absolute',
-    top: 181,
+    top: 153,
   },
   heading: {
-    fontSize: 32,
+    fontSize: 28,
     fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
     color: OceanColors.white,
-    marginBottom: 32,
+    marginBottom: 24,
     textAlign: 'center',
     fontWeight: '700',
   },
@@ -178,41 +209,41 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'transparent',
-    borderRadius: 24,
-    borderWidth: 1,
+    borderRadius: 20,
+    borderWidth: 0.7,
     borderColor: 'rgba(181,230,255,0.45)',
-    paddingHorizontal: 16,
-    marginBottom: 16,
-    height: 50,
+    paddingHorizontal: 14,
+    marginBottom: 14,
+    height: 46,
   },
   inputIcon: {
     marginRight: 12,
   },
   input: {
     flex: 1,
-    fontSize: 16,
+    fontSize: 15,
     fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
     color: OceanColors.white,
   },
   forgotPasswordContainer: {
     alignItems: 'flex-end',
-    marginBottom: 24,
+    marginBottom: 20,
   },
   forgotPasswordText: {
     color: OceanColors.textSecondary,
-    fontSize: 13,
+    fontSize: 12,
     fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
     textDecorationLine: 'underline',
   },
   loginButton: {
     backgroundColor: 'transparent',
     borderRadius: 999,
-    paddingVertical: 14,
+    paddingVertical: 12,
     alignItems: 'center',
     alignSelf: 'center',
-    width: 180,
-    marginBottom: 40,
-    borderWidth: 1,
+    width: 152,
+    marginBottom: 28,
+    borderWidth: 0.7,
     borderColor: 'rgba(181,230,255,0.7)',
   },
   buttonDisabled: {
@@ -220,7 +251,7 @@ const styles = StyleSheet.create({
   },
   loginButtonText: {
     color: OceanColors.white,
-    fontSize: 16,
+    fontSize: 14,
     fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
     letterSpacing: 0.5,
   },
@@ -231,13 +262,56 @@ const styles = StyleSheet.create({
   },
   signupText: {
     color: OceanColors.textSecondary,
-    fontSize: 14,
+    fontSize: 12,
     fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
   },
   signupLink: {
     color: OceanColors.cyan,
-    fontSize: 14,
+    fontSize: 12,
     fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
     textDecorationLine: 'underline',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(6, 12, 28, 0.86)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 22,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 320,
+    borderRadius: 24,
+    borderWidth: 0.7,
+    borderColor: 'rgba(181,230,255,0.34)',
+    backgroundColor: 'rgba(4, 18, 43, 0.96)',
+    paddingHorizontal: 18,
+    paddingVertical: 18,
+  },
+  modalTitle: {
+    color: OceanColors.white,
+    fontSize: 18,
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+    marginBottom: 10,
+  },
+  modalCopy: {
+    color: OceanColors.textSecondary,
+    fontSize: 12,
+    lineHeight: 18,
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+    marginBottom: 16,
+  },
+  modalButton: {
+    alignSelf: 'flex-end',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 999,
+    borderWidth: 0.7,
+    borderColor: 'rgba(181,230,255,0.45)',
+  },
+  modalButtonText: {
+    color: OceanColors.white,
+    fontSize: 12,
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
   },
 });

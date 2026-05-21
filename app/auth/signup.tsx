@@ -6,11 +6,12 @@ import React, { useState } from "react";
 import {
   Image,
   KeyboardAvoidingView,
+  Modal,
   Platform,
+  TextInput as RNTextInput,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -25,10 +26,11 @@ export default function SignupScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [termsAlertVisible, setTermsAlertVisible] = useState(false);
 
   const handleSignup = async () => {
     if (!termsAccepted) {
-      alert("Please accept the Terms of Service and Privacy Policy");
+      setTermsAlertVisible(true);
       return;
     }
 
@@ -87,7 +89,7 @@ export default function SignupScreen() {
                 color={OceanColors.white}
                 style={styles.inputIcon}
               />
-              <TextInput
+              <RNTextInput
                 style={styles.input}
                 placeholder="Username"
                 placeholderTextColor="rgba(255,255,255,0.6)"
@@ -98,7 +100,7 @@ export default function SignupScreen() {
               />
             </View>
 
-            {}
+            
             <View style={styles.inputContainer}>
               <MaterialIcons
                 name="mail-outline"
@@ -106,7 +108,7 @@ export default function SignupScreen() {
                 color={OceanColors.white}
                 style={styles.inputIcon}
               />
-              <TextInput
+              <RNTextInput
                 style={styles.input}
                 placeholder="Email"
                 placeholderTextColor="rgba(255,255,255,0.6)"
@@ -118,7 +120,7 @@ export default function SignupScreen() {
               />
             </View>
 
-            {}
+            
             <View style={styles.inputContainer}>
               <MaterialIcons
                 name="lock-outline"
@@ -126,7 +128,7 @@ export default function SignupScreen() {
                 color={OceanColors.white}
                 style={styles.inputIcon}
               />
-              <TextInput
+              <RNTextInput
                 style={styles.input}
                 placeholder="Password"
                 placeholderTextColor="rgba(255,255,255,0.6)"
@@ -156,7 +158,7 @@ export default function SignupScreen() {
                 color={OceanColors.white}
                 style={styles.inputIcon}
               />
-              <TextInput
+              <RNTextInput
                 style={styles.input}
                 placeholder="Confirm password"
                 placeholderTextColor="rgba(255,255,255,0.6)"
@@ -192,7 +194,7 @@ export default function SignupScreen() {
                 {termsAccepted && (
                   <MaterialIcons
                     name="check"
-                    size={16}
+                    size={14}
                     color={OceanColors.white}
                   />
                 )}
@@ -227,6 +229,30 @@ export default function SignupScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <Modal
+        transparent
+        visible={termsAlertVisible}
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => setTermsAlertVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Terms Required</Text>
+            <Text style={styles.modalCopy}>
+              Please accept the Terms of Service and Privacy Policy to continue.
+            </Text>
+            <TouchableOpacity
+              activeOpacity={1}
+              style={styles.modalButton}
+              onPress={() => setTermsAlertVisible(false)}
+            >
+              <Text style={styles.modalButtonText}>Understood</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -245,36 +271,36 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingHorizontal: 24,
-    paddingVertical: 24,
+    paddingVertical: 20,
     zIndex: 1,
   },
   logoSection: {
     alignItems: "center",
     justifyContent: "flex-start",
     width: "100%",
-    height: 194,
+    height: 160,
     marginBottom: 8,
     position: "relative",
   },
   logoImage: {
-    width: 185,
-    height: 185,
+    width: 150,
+    height: 150,
     position: "absolute",
     top: 0,
   },
   brandName: {
-    fontSize: 18,
+    fontSize: 16,
     fontFamily: Platform.OS === "ios" ? "Georgia" : "serif",
     color: OceanColors.textSecondary,
     letterSpacing: 1,
     position: "absolute",
-    top: 181,
+    top: 153,
   },
   heading: {
-    fontSize: 32,
+    fontSize: 28,
     fontFamily: Platform.OS === "ios" ? "Georgia" : "serif",
     color: OceanColors.white,
-    marginBottom: 32,
+    marginBottom: 24,
     textAlign: "center",
     fontWeight: "700",
   },
@@ -282,32 +308,32 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "transparent",
-    borderRadius: 24,
-    borderWidth: 1,
+    borderRadius: 20,
+    borderWidth: 0.7,
     borderColor: "rgba(181,230,255,0.45)",
-    paddingHorizontal: 16,
-    marginBottom: 16,
-    height: 50,
+    paddingHorizontal: 14,
+    marginBottom: 14,
+    height: 46,
   },
   inputIcon: {
     marginRight: 12,
   },
   input: {
     flex: 1,
-    fontSize: 16,
+    fontSize: 15,
     fontFamily: Platform.OS === "ios" ? "Georgia" : "serif",
     color: OceanColors.white,
   },
   checkboxContainer: {
     flexDirection: "row",
     alignItems: "flex-start",
-    marginBottom: 24,
+    marginBottom: 20,
     paddingHorizontal: 4,
   },
   checkbox: {
     width: 20,
     height: 20,
-    borderWidth: 2,
+    borderWidth: 0.75,
     borderColor: OceanColors.cyan,
     borderRadius: 4,
     marginRight: 12,
@@ -322,7 +348,7 @@ const styles = StyleSheet.create({
   termsText: {
     flex: 1,
     color: OceanColors.textSecondary,
-    fontSize: 12,
+    fontSize: 11,
     fontFamily: Platform.OS === "ios" ? "Georgia" : "serif",
     lineHeight: 18,
   },
@@ -333,12 +359,12 @@ const styles = StyleSheet.create({
   signupButton: {
     backgroundColor: "transparent",
     borderRadius: 999,
-    paddingVertical: 14,
+    paddingVertical: 12,
     alignItems: "center",
     alignSelf: "center",
-    width: 180,
-    marginBottom: 24,
-    borderWidth: 1,
+    width: 152,
+    marginBottom: 20,
+    borderWidth: 0.7,
     borderColor: "rgba(181,230,255,0.7)",
   },
   buttonDisabled: {
@@ -346,7 +372,7 @@ const styles = StyleSheet.create({
   },
   signupButtonText: {
     color: OceanColors.white,
-    fontSize: 16,
+    fontSize: 14,
     fontFamily: Platform.OS === "ios" ? "Georgia" : "serif",
     letterSpacing: 0.5,
   },
@@ -357,13 +383,56 @@ const styles = StyleSheet.create({
   },
   loginText: {
     color: OceanColors.textSecondary,
-    fontSize: 14,
+    fontSize: 12,
     fontFamily: Platform.OS === "ios" ? "Georgia" : "serif",
   },
   loginLink: {
     color: OceanColors.cyan,
-    fontSize: 14,
+    fontSize: 12,
     fontFamily: Platform.OS === "ios" ? "Georgia" : "serif",
     textDecorationLine: "underline",
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(6, 12, 28, 0.86)",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 22,
+  },
+  modalCard: {
+    width: "100%",
+    maxWidth: 320,
+    borderRadius: 24,
+    borderWidth: 0.7,
+    borderColor: "rgba(181,230,255,0.34)",
+    backgroundColor: "rgba(4, 18, 43, 0.96)",
+    paddingHorizontal: 18,
+    paddingVertical: 18,
+  },
+  modalTitle: {
+    color: OceanColors.white,
+    fontSize: 18,
+    fontFamily: Platform.OS === "ios" ? "Georgia" : "serif",
+    marginBottom: 10,
+  },
+  modalCopy: {
+    color: OceanColors.textSecondary,
+    fontSize: 12,
+    lineHeight: 18,
+    fontFamily: Platform.OS === "ios" ? "Georgia" : "serif",
+    marginBottom: 16,
+  },
+  modalButton: {
+    alignSelf: "flex-end",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 999,
+    borderWidth: 0.7,
+    borderColor: "rgba(181,230,255,0.45)",
+  },
+  modalButtonText: {
+    color: OceanColors.white,
+    fontSize: 12,
+    fontFamily: Platform.OS === "ios" ? "Georgia" : "serif",
   },
 });

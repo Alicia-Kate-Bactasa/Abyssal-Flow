@@ -6,7 +6,6 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } 
 import {
     Animated,
     Dimensions,
-    FlatList,
     Keyboard,
     KeyboardAvoidingView,
     Platform,
@@ -22,14 +21,12 @@ import {
 const { height } = Dimensions.get("window");
 const TOTAL_STEPS = 14;
 
-// ─── Picker constants (Step 9) ───────────────────────────────────────────────
+// ─── Cycle length bounds (Step 9) ────────────────────────────────────────────
 const ITEM_HEIGHT = 32;
 const VISIBLE_ITEMS = 7;
-const CYCLE_OPTIONS = [
-  ...Array.from({ length: 25 }, (_, i) => String(21 + i)),
-  "im not sure",
-];
-const DEFAULT_CYCLE = "28";
+const MIN_CYCLE_LENGTH = 20;
+const MAX_CYCLE_LENGTH = 45;
+const DEFAULT_CYCLE_LENGTH = 28;
 
 // ─── Calendar constants (Step 8) ─────────────────────────────────────────────
 const DAYS = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
@@ -42,6 +39,29 @@ function getDaysInMonth(year: number, month: number) {
 }
 function getFirstDayOfMonth(year: number, month: number) {
   return new Date(year, month, 1).getDay();
+}
+function buildMonthWeeks(year: number, month: number) {
+  const firstDay = getFirstDayOfMonth(year, month);
+  const daysInMonth = getDaysInMonth(year, month);
+  const cells: (number | null)[] = [
+    ...Array(firstDay).fill(null),
+    ...Array.from({ length: daysInMonth }, (_, index) => index + 1),
+  ];
+
+  while (cells.length < 42) cells.push(null);
+
+  const weeks: (number | null)[][] = [];
+  for (let index = 0; index < 42; index += 7) {
+    weeks.push(cells.slice(index, index + 7));
+  }
+
+  return weeks;
+}
+function formatShortDate(date: Date) {
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const year = String(date.getFullYear()).slice(-2);
+  return `${month}/${day}/${year}`;
 }
 
 // ─── Data sets ───────────────────────────────────────────────────────────────
@@ -225,12 +245,15 @@ export default function LandingScreen() {
   // Collected data
   const [nickname, setNickname] = useState("");
   const [birthday, setBirthday] = useState("");
+  const [birthdayPickerOpen, setBirthdayPickerOpen] = useState(false);
+  const [birthdayViewYear, setBirthdayViewYear] = useState(() => new Date().getFullYear() - 20);
+  const [birthdayViewMonth, setBirthdayViewMonth] = useState(() => new Date().getMonth());
   const [cycleRegularity, setCycleRegularity] = useState<string | null>(null);
   const [healthHistory, setHealthHistory] = useState<string[]>([]);
   const [medicalCheckups, setMedicalCheckups] = useState<string | null>(null);
   const [medications, setMedications] = useState<string[]>([]);
   const [selectedDates, setSelectedDates] = useState<string[]>([]);
-  const [cycleLength, setCycleLength] = useState(DEFAULT_CYCLE);
+  const [cycleLength, setCycleLength] = useState(DEFAULT_CYCLE_LENGTH);
   const [typicalFlow, setTypicalFlow] = useState<string | null>(null);
   const [symptoms, setSymptoms] = useState<string[]>([]);
   const [moods, setMoods] = useState<string[]>([]);
@@ -241,21 +264,11 @@ export default function LandingScreen() {
   const [currentYear, setCurrentYear] = useState(now.getFullYear());
   const [currentMonth, setCurrentMonth] = useState(now.getMonth());
 
-  // Cycle picker ref (Step 9)
-  const flatListRef = useRef<FlatList>(null);
-
   const anim = useStepAnimation();
 
   // Animate on step change
   useEffect(() => {
     anim.run();
-
-    if (step === 9) {
-      const defaultIndex = CYCLE_OPTIONS.indexOf(DEFAULT_CYCLE);
-      setTimeout(() => {
-        flatListRef.current?.scrollToIndex({ index: defaultIndex, animated: false });
-      }, 150);
-    }
   }, [anim, step]);
 
   // ── Navigation helpers ──────────────────────────────────────────────────────
@@ -296,6 +309,36 @@ export default function LandingScreen() {
   };
   const isDateSelected = (day: number) =>
     selectedDates.includes(`${currentYear}-${currentMonth}-${day}`);
+
+  const selectBirthday = (day: number) => {
+    const chosen = new Date(birthdayViewYear, birthdayViewMonth, day);
+    setBirthday(formatShortDate(chosen));
+    setBirthdayPickerOpen(false);
+  };
+
+  const renderBirthdayGrid = () => {
+    const weeks = buildMonthWeeks(birthdayViewYear, birthdayViewMonth);
+    return weeks.map((week, weekIndex) => (
+      <View key={weekIndex} style={s.dayGridRow}>
+        {week.map((day, cellIndex) => {
+          if (!day) {
+            return <View key={`birthday-empty-${cellIndex}`} style={s.dayCell} />;
+          }
+          const isSelected = birthday === formatShortDate(new Date(birthdayViewYear, birthdayViewMonth, day));
+          return (
+            <TouchableOpacity
+              activeOpacity={1}
+              key={`${birthdayViewYear}-${birthdayViewMonth}-${day}`}
+              style={[s.dayCell, isSelected && s.dayCellSelected]}
+              onPress={() => selectBirthday(day)}
+            >
+              <Text style={[s.dayNumber, isSelected && s.dayNumberSelected]}>{day}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    ));
+  };
 
   const renderCalendarDays = () => {
     const daysInMonth = getDaysInMonth(currentYear, currentMonth);
@@ -383,16 +426,67 @@ export default function LandingScreen() {
       // Step 2 – Birthday
       case 2:
         return (
-          <Animated.View style={[s.inputWrapper, { opacity: anim.bodyOpacity }]}>
-            <TextInput
-              style={s.input}
-              placeholder="MM/DD/YYYY"
-              placeholderTextColor="rgba(255, 252, 252, 0.66)"
-              value={birthday}
-              onChangeText={setBirthday}
-              keyboardType="default"
-              autoCorrect={false}
-            />
+          <Animated.View style={[s.birthdayPickerShell, { opacity: anim.bodyOpacity }]}> 
+            <TouchableOpacity
+              activeOpacity={1}
+              style={s.birthdayField}
+              onPress={() => setBirthdayPickerOpen((visible) => !visible)}
+            >
+              <Text style={[s.birthdayFieldText, !birthday && s.birthdayFieldPlaceholder]}>
+                {birthday || "MM/DD/YY"}
+              </Text>
+              <Ionicons
+                name={birthdayPickerOpen ? "chevron-up" : "chevron-down"}
+                size={18}
+                color="#B5D6EE"
+              />
+            </TouchableOpacity>
+
+            {birthdayPickerOpen ? (
+              <View style={s.birthdayCalendarCard}>
+                <View style={s.calendarHeader}>
+                  <TouchableOpacity
+                    activeOpacity={1}
+                    onPress={() => {
+                      if (birthdayViewMonth === 0) {
+                        setBirthdayViewMonth(11);
+                        setBirthdayViewYear((year) => year - 1);
+                      } else {
+                        setBirthdayViewMonth((month) => month - 1);
+                      }
+                    }}
+                    style={s.navButton}
+                  >
+                    <Text style={s.navArrow}>‹</Text>
+                  </TouchableOpacity>
+                  <Text style={s.monthLabel}>
+                    {MONTHS[birthdayViewMonth]} {birthdayViewYear}
+                  </Text>
+                  <TouchableOpacity
+                    activeOpacity={1}
+                    onPress={() => {
+                      if (birthdayViewMonth === 11) {
+                        setBirthdayViewMonth(0);
+                        setBirthdayViewYear((year) => year + 1);
+                      } else {
+                        setBirthdayViewMonth((month) => month + 1);
+                      }
+                    }}
+                    style={s.navButton}
+                  >
+                    <Text style={s.navArrow}>›</Text>
+                  </TouchableOpacity>
+                </View>
+                <View style={s.dayHeaders}>
+                  {DAYS.map((day) => (
+                    <Text key={day} style={s.dayHeader}>
+                      {day}
+                    </Text>
+                  ))}
+                </View>
+                <View style={s.dayGrid}>{renderBirthdayGrid()}</View>
+              </View>
+            ) : null}
           </Animated.View>
         );
 
@@ -502,35 +596,32 @@ export default function LandingScreen() {
       // Step 9 – Cycle length picker
       case 9:
         return (
-          <Animated.View style={[s.pickerWrapper, { opacity: anim.bodyOpacity }]}>
-            <View style={s.selectionHighlight} pointerEvents="none" />
-            <FlatList
-              ref={flatListRef}
-              data={CYCLE_OPTIONS}
-              keyExtractor={(item) => item}
-              renderItem={({ item }) => {
-                const sel = item === cycleLength;
-                return (
-                  <TouchableOpacity
-                    activeOpacity={1}
-                    style={[s.pickerItem, sel && s.pickerItemSelected]}
-                    onPress={() => setCycleLength(item)}
-                  >
-                    <Text style={[s.pickerItemText, sel && s.pickerItemTextSelected]}>{item}</Text>
-                  </TouchableOpacity>
-                );
-              }}
-              showsVerticalScrollIndicator={false}
-              style={s.flatList}
-              contentContainerStyle={s.flatListContent}
-              snapToInterval={ITEM_HEIGHT}
-              decelerationRate="fast"
-              getItemLayout={(_, index) => ({ length: ITEM_HEIGHT, offset: ITEM_HEIGHT * index, index })}
-              onMomentumScrollEnd={(e) => {
-                const index = Math.round(e.nativeEvent.contentOffset.y / ITEM_HEIGHT);
-                if (CYCLE_OPTIONS[index]) setCycleLength(CYCLE_OPTIONS[index]);
-              }}
-            />
+          <Animated.View style={[s.cycleLengthShell, { opacity: anim.bodyOpacity }]}> 
+            <View style={s.cycleLengthCard}>
+              <TouchableOpacity
+                activeOpacity={1}
+                style={s.cycleLengthButton}
+                onPress={() => setCycleLength((value) => Math.max(MIN_CYCLE_LENGTH, value - 1))}
+              >
+                <Ionicons name="remove" size={22} color="#EAF4FF" />
+              </TouchableOpacity>
+
+              <View style={s.cycleLengthValueWrap}>
+                <Text style={s.cycleLengthValue}>{cycleLength}</Text>
+                <Text style={s.cycleLengthLabel}>days</Text>
+              </View>
+
+              <TouchableOpacity
+                activeOpacity={1}
+                style={s.cycleLengthButton}
+                onPress={() => setCycleLength((value) => Math.min(MAX_CYCLE_LENGTH, value + 1))}
+              >
+                <Ionicons name="add" size={22} color="#EAF4FF" />
+              </TouchableOpacity>
+            </View>
+            <Text style={s.cycleLengthHint}>
+              Tap the controls to fine-tune your average cycle length.
+            </Text>
           </Animated.View>
         );
 
@@ -791,7 +882,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 20,
     height: 55,
     justifyContent: "center",
-    borderWidth: 1,
+    borderWidth: 0.7,
     borderColor: "rgba(181,230,255,0.42)",
     shadowColor: "transparent",
     shadowOffset: { width: 0, height: 0 },
@@ -810,7 +901,7 @@ const s = StyleSheet.create({
     backgroundColor: "transparent",
     borderRadius: 24,
     padding: 16,
-    borderWidth: 1,
+    borderWidth: 0.7,
     borderColor: "rgba(181,230,255,0.42)",
     marginBottom: 12,
   },
@@ -837,7 +928,7 @@ const s = StyleSheet.create({
     borderRadius: 24,
     height: 55,
     paddingHorizontal: 14,
-    borderWidth: 1,
+    borderWidth: 0.7,
     borderColor: "rgba(181,230,255,0.42)",
     marginBottom: 10,
   },
@@ -847,7 +938,7 @@ const s = StyleSheet.create({
     height: 18,
     borderRadius: 10,
     backgroundColor: "transparent",
-    borderWidth: 1,
+    borderWidth: 0.7,
     borderColor: "rgba(225,242,255,0.5)",
     justifyContent: "center",
     alignItems: "center",
@@ -870,7 +961,7 @@ const s = StyleSheet.create({
     backgroundColor: "transparent",
     borderRadius: 24,
     padding: 20,
-    borderWidth: 1,
+    borderWidth: 0.7,
     borderColor: "rgba(181,230,255,0.42)",
     shadowColor: "transparent",
     shadowOffset: { width: 0, height: 0 },
@@ -900,8 +991,8 @@ const s = StyleSheet.create({
     color: "#B5BEC6",
   },
   dayGrid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", rowGap: 8 },
-  dayCell: { width: 30, height: 30, borderRadius: 15, justifyContent: "center", alignItems: "center", borderWidth: 1, borderColor: "transparent" },
-  dayCellSelected: { borderColor: "#ff4343" },
+  dayCell: { width: 30, height: 30, borderRadius: 15, justifyContent: "center", alignItems: "center", borderWidth: 0.7, borderColor: "transparent" },
+  dayCellSelected: { backgroundColor: "#ff4343" },
   dayNumber: {
     fontFamily: Platform.OS === "ios" ? "Georgia" : "serif",
     fontSize: 10,
@@ -909,7 +1000,98 @@ const s = StyleSheet.create({
     color: "#FFFFFF",
     textAlign: "center",
   },
-  dayNumberSelected: { color: "#ff2949" },
+  dayNumberSelected: { color: "#FFFFFF" },
+
+  birthdayPickerShell: {
+    width: "100%",
+  },
+  birthdayField: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "transparent",
+    borderRadius: 20,
+    paddingHorizontal: 18,
+    height: 52,
+    borderWidth: 0.7,
+    borderColor: "rgba(181,230,255,0.42)",
+  },
+  birthdayFieldText: {
+    flex: 1,
+    fontFamily: Platform.OS === "ios" ? "Georgia" : "serif",
+    fontSize: 15,
+    color: "#FFFFFF",
+  },
+  birthdayFieldPlaceholder: {
+    color: "rgba(255, 252, 252, 0.66)",
+  },
+  birthdayCalendarCard: {
+    marginTop: 12,
+    borderRadius: 22,
+    padding: 16,
+    borderWidth: 0.7,
+    borderColor: "rgba(181,230,255,0.34)",
+    backgroundColor: "rgba(9, 28, 58, 0.58)",
+  },
+  dayGridRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
+
+  cycleLengthShell: {
+    width: "100%",
+    alignItems: "center",
+  },
+  cycleLengthCard: {
+    width: "100%",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 18,
+    paddingHorizontal: 16,
+    borderRadius: 28,
+    borderWidth: 0.7,
+    borderColor: "rgba(181,230,255,0.42)",
+    backgroundColor: "rgba(9, 28, 58, 0.42)",
+  },
+  cycleLengthButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 0.7,
+    borderColor: "rgba(181,230,255,0.34)",
+    backgroundColor: "rgba(255,255,255,0.04)",
+  },
+  cycleLengthValueWrap: {
+    alignItems: "center",
+    justifyContent: "center",
+    flex: 1,
+  },
+  cycleLengthValue: {
+    fontFamily: Platform.OS === "ios" ? "Georgia" : "serif",
+    fontSize: 34,
+    fontWeight: "700",
+    color: "#FFFFFF",
+    lineHeight: 40,
+  },
+  cycleLengthLabel: {
+    fontFamily: Platform.OS === "ios" ? "Georgia" : "serif",
+    fontSize: 12,
+    color: "rgba(225,242,255,0.72)",
+    letterSpacing: 0.6,
+    marginTop: 2,
+  },
+  cycleLengthHint: {
+    marginTop: 10,
+    color: "rgba(225,242,255,0.72)",
+    fontSize: 11,
+    lineHeight: 16,
+    textAlign: "center",
+    fontFamily: Platform.OS === "ios" ? "Georgia" : "serif",
+  },
 
   // Picker (step 9)
   pickerWrapper: {
@@ -981,7 +1163,7 @@ const s = StyleSheet.create({
     height: 47,
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 1,
+    borderWidth: 0.7,
     borderColor: "rgba(181,230,255,0.55)",
     shadowColor: "transparent",
     shadowOffset: { width: 0, height: 0 },
