@@ -1,3 +1,5 @@
+import { useCycleData } from "@/hooks/use-cycle-store";
+import { useUser } from "@/hooks/use-user-store";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -13,8 +15,6 @@ import {
 import Svg, { Path } from "react-native-svg";
 
 const { width, height } = Dimensions.get("window");
-
-const CYCLE_LENGTH = 28;
 
 const MOON_SIZE = width * 0.74;
 const WRAPPER_SIZE = width * 1.6;
@@ -42,13 +42,30 @@ type PhaseConfig = {
   wavePoints: [number, number, number, number, number, number, number];
 };
 
-const getCycleDay = (day: number) => ((day - 1) % CYCLE_LENGTH) + 1;
+const DAY_MS = 1000 * 60 * 60 * 24;
 
-const getPhaseKey = (cycleDay: number): PhaseKey => {
-  if (cycleDay <= 5) return "menstrual";
-  if (cycleDay <= 13) return "follicular";
-  if (cycleDay <= 17) return "ovulation";
+const getCycleDay = (day: number, cycleLength: number) => ((day - 1) % cycleLength) + 1;
+
+const getPhaseKey = (cycleDay: number, cycleLength: number): PhaseKey => {
+  const menstrualEnd = Math.max(4, Math.round(cycleLength * 0.18));
+  const follicularEnd = Math.max(menstrualEnd + 1, Math.round(cycleLength * 0.46));
+  const ovulationEnd = Math.max(follicularEnd + 1, Math.round(cycleLength * 0.61));
+
+  if (cycleDay <= menstrualEnd) return "menstrual";
+  if (cycleDay <= follicularEnd) return "follicular";
+  if (cycleDay <= ovulationEnd) return "ovulation";
   return "luteal";
+};
+
+const getDaysBetween = (start: Date, end: Date) => {
+  const startUtc = Date.UTC(start.getFullYear(), start.getMonth(), start.getDate());
+  const endUtc = Date.UTC(end.getFullYear(), end.getMonth(), end.getDate());
+  return Math.max(0, Math.floor((endUtc - startUtc) / DAY_MS));
+};
+
+const getCycleDayFromDates = (anchor: Date, date: Date, cycleLength: number) => {
+  const daysSinceStart = getDaysBetween(anchor, date);
+  return (daysSinceStart % cycleLength) + 1;
 };
 
 const WAVE_X = {
@@ -518,13 +535,19 @@ const CircularCalendarDial = ({
 // 2. THE MAIN SCREEN EXPORT
 // ==========================================
 export default function Dashboard() {
+  const { getCycleStats, getLatestPeriodStart } = useCycleData();
+  const { user } = useUser();
   const [activeDay, setActiveDay] = useState(new Date().getDate());
   const [footerDate, setFooterDate] = useState(new Date());
-  const cycleDay = getCycleDay(activeDay);
-  const phaseKey = getPhaseKey(cycleDay);
+  const cycleStats = getCycleStats();
+  const latestPeriodStart = getLatestPeriodStart();
+  const cycleLength = cycleStats.cycleLength;
+  const cycleDay = latestPeriodStart
+    ? getCycleDayFromDates(latestPeriodStart, footerDate, cycleLength)
+    : getCycleDay(activeDay, cycleLength);
+  const phaseKey = getPhaseKey(cycleDay, cycleLength);
   const phase = PHASES[phaseKey];
-  const daysUntilPeriod = CYCLE_LENGTH - cycleDay + 1;
-  const anchorCycleDayRef = useRef(getCycleDay(new Date().getDate()));
+  const daysUntilPeriod = cycleLength - cycleDay + 1;
 
   const [previousPhaseKey, setPreviousPhaseKey] = useState<PhaseKey>(phaseKey);
   const fadeAnim = useRef(new Animated.Value(1)).current;
@@ -599,7 +622,7 @@ export default function Dashboard() {
           onDateChange={setFooterDate}
           activeDay={activeDay}
           moonColor={phase.moonColor}
-          anchorCycleDay={anchorCycleDayRef.current}
+          anchorCycleDay={cycleDay}
         />
       </View>
 
@@ -614,7 +637,7 @@ export default function Dashboard() {
 
       <View style={styles.contentOverlay} pointerEvents="box-none">
         <View style={styles.header} pointerEvents="box-none">
-          <Text style={styles.greeting}>Hello, ishie!</Text>
+          <Text style={styles.greeting}>Hello, {user.nickname.trim() || "ishie"}!</Text>
           <Text style={styles.subGreeting}>{subGreetingText}</Text>
           <View style={styles.divider} />
           <Text style={styles.phaseTitle}>{phase.title}</Text>
@@ -622,7 +645,7 @@ export default function Dashboard() {
         </View>
 
         <View style={styles.bottomInfo} pointerEvents="none">
-          <Text style={styles.bigDayText}>DAY {activeDay}</Text>
+          <Text style={styles.bigDayText}>DAY {cycleDay}</Text>
           <Text style={styles.ofCycle}>of cycle</Text>
           <Text style={styles.monthFooter}>
             {footerDate

@@ -1,4 +1,4 @@
-import { CycleDataProvider, useCycleData } from "@/hooks/use-cycle-store";
+import { useCycleData } from "@/hooks/use-cycle-store";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { Tabs } from "expo-router";
@@ -360,7 +360,7 @@ export default function TabLayout() {
   const [modalOpen, setModalOpen] = useState(false);
 
   return (
-    <CycleDataProvider>
+    <>
       <Tabs tabBar={(props) => <CustomTabBar {...props} modalOpen={modalOpen} setModalOpen={setModalOpen} />} screenOptions={{ headerShown: false }}>
         <Tabs.Screen name="dashboard" />
         <Tabs.Screen name="insights" />
@@ -369,7 +369,7 @@ export default function TabLayout() {
         <Tabs.Screen name="profile" />
       </Tabs>
       <AddModal visible={modalOpen} onClose={() => setModalOpen(false)} />
-    </CycleDataProvider>
+    </>
   );
 }
 

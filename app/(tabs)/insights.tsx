@@ -3,14 +3,14 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Animated,
-  Dimensions,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    Animated,
+    Dimensions,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -50,11 +50,28 @@ const formatMonthLabel = (year: number, month: number) =>
     year: "numeric",
   });
 
-const getContextMessage = (moods: string[], symptoms: string[]) => {
+const getContextMessage = (
+  moods: string[],
+  symptoms: string[],
+  profile: {
+    cycleRegularity: string | null;
+    medicalCheckups: string | null;
+    typicalFlow: string | null;
+    healthHistory: string[];
+    medications: string[];
+    symptoms: string[];
+    moods: string[];
+  },
+) => {
   if (symptoms.includes("Bloating")) return "The tide surges. Drink more water to find your center.";
   if (symptoms.includes("Cramps")) return "Currents are swift. Rest in the ocean's gentle embrace.";
   if (moods.includes("Energetic")) return "You are a radiant pearl of energy today.";
   if (moods.includes("Anxious")) return "The sea is deep. Breathe deeply to calm the inner waters.";
+  if (profile.cycleRegularity === "irregular") return "Your cycle may shift more often, so every log sharpens the forecast.";
+  if (profile.typicalFlow === "heavy") return "Your heavier flow notes will help shape clearer tide predictions.";
+  if (profile.medicalCheckups === "no") return "Keep logging your tides so the forecast can stay accurate between checkups.";
+  if (profile.symptoms.includes("cramps") || profile.symptoms.includes("bloating")) return "Your saved symptom profile can help tune future tide guidance.";
+  if (profile.moods.includes("anxiety") || profile.moods.includes("lowmood")) return "Your mood profile is tracked to help surface calmer guidance.";
   return "Chart your path across the cosmic ocean of cycle insights.";
 };
 
@@ -126,6 +143,7 @@ export default function InsightsScreen() {
     getCycleStats,
     getLogsForDate,
     getSymptomFrequencyForMonth,
+    profile,
   } = useCycleData();
   
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -135,7 +153,7 @@ export default function InsightsScreen() {
   const selectedLog = getLogsForDate(selectedDate);
   const moods = selectedLog?.moods ?? [];
   const symptoms = selectedLog?.symptoms ?? [];
-  const contextMessage = getContextMessage(moods, symptoms);
+  const contextMessage = getContextMessage(moods, symptoms, profile);
 
   const currentMonthFrequency = getSymptomFrequencyForMonth(
     selectedDate.getFullYear(),

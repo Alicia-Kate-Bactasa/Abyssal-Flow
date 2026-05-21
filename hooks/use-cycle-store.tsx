@@ -1,23 +1,41 @@
-import React, { createContext, useCallback, useContext, useMemo, useState } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
 export type LogEntry = {
   moods: string[];
   symptoms: string[];
 };
 
+export type CycleProfile = {
+  birthday: string;
+  cycleRegularity: string | null;
+  healthHistory: string[];
+  medicalCheckups: string | null;
+  medications: string[];
+  typicalFlow: string | null;
+  symptoms: string[];
+  moods: string[];
+  comfortFood: string[];
+  cycleLength: number;
+};
+
 type CycleDataContextValue = {
   periodDates: Record<string, true>;
   predictedDates: Record<string, true>;
   logs: Record<string, LogEntry>;
+  profile: CycleProfile;
   togglePeriodDate: (date: Date) => void;
   replacePeriodDates: (dateKeys: string[]) => void;
   setPeriodDatesForMonth: (year: number, month: number, days: number[]) => void;
   recalcPredictions: () => void;
   logMoodSymptoms: (date: Date, moods: string[], symptoms: string[]) => void;
+  updateProfile: (patch: Partial<CycleProfile>) => void;
+  setCycleLength: (length: number) => void;
   getPeriodDaysForMonth: (year: number, month: number) => number[];
   getPredictedDaysForMonth: (year: number, month: number) => number[];
   getLogsForDate: (date: Date) => LogEntry | null;
-  getCycleStats: () => { avgCycleLength: number; avgPeriodLength: number };
+  getLatestPeriodStart: () => Date | null;
+  getCycleStats: () => { avgCycleLength: number; avgPeriodLength: number; cycleLength: number };
   getSymptomFrequencyForMonth: (year: number, month: number) =>
     { label: string; count: number }[];
 };
@@ -66,11 +84,64 @@ const buildPeriodRuns = (keys: string[]) => {
 
 const defaultCycleLength = 28;
 const defaultPeriodLength = 5;
+const STORAGE_KEY = "@abyssal_cycle_data";
+
+const defaultProfile: CycleProfile = {
+  birthday: "",
+  cycleRegularity: null,
+  healthHistory: [],
+  medicalCheckups: null,
+  medications: [],
+  typicalFlow: null,
+  symptoms: [],
+  moods: [],
+  comfortFood: [],
+  cycleLength: defaultCycleLength,
+};
 
 export function CycleDataProvider({ children }: { children: React.ReactNode }) {
   const [periodDates, setPeriodDates] = useState<Record<string, true>>({});
   const [predictedDates, setPredictedDates] = useState<Record<string, true>>({});
   const [logs, setLogs] = useState<Record<string, LogEntry>>({});
+  const [profile, setProfile] = useState<CycleProfile>(defaultProfile);
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const raw = await AsyncStorage.getItem(STORAGE_KEY);
+        if (!raw) return;
+        const parsed = JSON.parse(raw) as Partial<{
+          periodDates: Record<string, true>;
+          predictedDates: Record<string, true>;
+          logs: Record<string, LogEntry>;
+          profile: Partial<CycleProfile>;
+        }>;
+        if (parsed.periodDates) setPeriodDates(parsed.periodDates);
+        if (parsed.predictedDates) setPredictedDates(parsed.predictedDates);
+        if (parsed.logs) setLogs(parsed.logs);
+        if (parsed.profile) setProfile((prev) => ({ ...prev, ...parsed.profile }));
+      } catch {
+        // ignore storage errors and fall back to defaults
+      } finally {
+        setHydrated(true);
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    (async () => {
+      try {
+        await AsyncStorage.setItem(
+          STORAGE_KEY,
+          JSON.stringify({ periodDates, predictedDates, logs, profile }),
+        );
+      } catch {
+        // ignore storage errors
+      }
+    })();
+  }, [hydrated, periodDates, predictedDates, logs, profile]);
 
   const togglePeriodDate = useCallback((date: Date) => {
     const key = formatDateKey(date);
@@ -150,6 +221,8 @@ export function CycleDataProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
+    const cycleLength = starts.length >= 2 ? avgCycleLength : profile.cycleLength;
+
     let avgPeriodLength = defaultPeriodLength;
     if (runs.length) {
       avgPeriodLength = Math.round(
@@ -166,7 +239,7 @@ export function CycleDataProvider({ children }: { children: React.ReactNode }) {
     let cursor = new Date(lastStart);
 
     for (let i = 0; i < monthsAhead; i += 1) {
-      cursor = new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate() + avgCycleLength);
+      cursor = new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate() + cycleLength);
       for (let day = 0; day < avgPeriodLength; day += 1) {
         const predicted = new Date(
           cursor.getFullYear(),
@@ -178,7 +251,7 @@ export function CycleDataProvider({ children }: { children: React.ReactNode }) {
     }
 
     setPredictedDates(nextPredictions);
-  }, [periodDates]);
+  }, [periodDates, profile.cycleLength]);
 
   const logMoodSymptoms = useCallback(
     (date: Date, moods: string[], symptoms: string[]) => {
@@ -191,10 +264,27 @@ export function CycleDataProvider({ children }: { children: React.ReactNode }) {
     [],
   );
 
+  const updateProfile = useCallback((patch: Partial<CycleProfile>) => {
+    setProfile((prev) => ({ ...prev, ...patch }));
+  }, []);
+
+  const setCycleLength = useCallback((length: number) => {
+    setProfile((prev) => ({
+      ...prev,
+      cycleLength: Math.max(20, Math.min(45, Math.round(length))),
+    }));
+  }, []);
+
   const getLogsForDate = useCallback(
     (date: Date) => logs[formatDateKey(date)] ?? null,
     [logs],
   );
+
+  const getLatestPeriodStart = useCallback(() => {
+    const runs = buildPeriodRuns(Object.keys(periodDates));
+    if (!runs.length) return null;
+    return parseDateKey(runs[runs.length - 1][0]);
+  }, [periodDates]);
 
   const getCycleStats = useCallback(() => {
     const periodKeys = Object.keys(periodDates);
@@ -218,6 +308,8 @@ export function CycleDataProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
+    const cycleLength = starts.length >= 2 ? avgCycleLength : profile.cycleLength;
+
     let avgPeriodLength = defaultPeriodLength;
     if (runs.length) {
       avgPeriodLength = Math.round(
@@ -225,8 +317,8 @@ export function CycleDataProvider({ children }: { children: React.ReactNode }) {
       );
     }
 
-    return { avgCycleLength, avgPeriodLength };
-  }, [periodDates]);
+    return { avgCycleLength, avgPeriodLength, cycleLength };
+  }, [periodDates, profile.cycleLength]);
 
   const getSymptomFrequencyForMonth = useCallback(
     (year: number, month: number) => {
@@ -250,14 +342,18 @@ export function CycleDataProvider({ children }: { children: React.ReactNode }) {
       periodDates,
       predictedDates,
       logs,
+      profile,
       togglePeriodDate,
       replacePeriodDates,
       setPeriodDatesForMonth,
       recalcPredictions,
       logMoodSymptoms,
+      updateProfile,
+      setCycleLength,
       getPeriodDaysForMonth,
       getPredictedDaysForMonth,
       getLogsForDate,
+      getLatestPeriodStart,
       getCycleStats,
       getSymptomFrequencyForMonth,
     }),
@@ -265,18 +361,27 @@ export function CycleDataProvider({ children }: { children: React.ReactNode }) {
       periodDates,
       predictedDates,
       logs,
+      profile,
       togglePeriodDate,
       replacePeriodDates,
       setPeriodDatesForMonth,
       recalcPredictions,
       logMoodSymptoms,
+      updateProfile,
+      setCycleLength,
       getPeriodDaysForMonth,
       getPredictedDaysForMonth,
       getLogsForDate,
+      getLatestPeriodStart,
       getCycleStats,
       getSymptomFrequencyForMonth,
     ],
   );
+
+  useEffect(() => {
+    if (!hydrated) return;
+    recalcPredictions();
+  }, [hydrated, periodDates, profile.cycleLength, recalcPredictions]);
 
   return (
     <CycleDataContext.Provider value={value}>

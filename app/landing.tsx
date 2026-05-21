@@ -1,4 +1,6 @@
 import WaveBackground from "@/components/WaveBackground";
+import { formatDateKey, useCycleData } from "@/hooks/use-cycle-store";
+import { useUser } from "@/hooks/use-user-store";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
@@ -24,9 +26,6 @@ const TOTAL_STEPS = 14;
 // ─── Cycle length bounds (Step 9) ────────────────────────────────────────────
 const ITEM_HEIGHT = 32;
 const VISIBLE_ITEMS = 7;
-const MIN_CYCLE_LENGTH = 20;
-const MAX_CYCLE_LENGTH = 45;
-const DEFAULT_CYCLE_LENGTH = 28;
 
 // ─── Calendar constants (Step 8) ─────────────────────────────────────────────
 const DAYS = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
@@ -243,6 +242,8 @@ function ProgressBar({ step }: { step: number }) {
 export default function LandingScreen() {
   const router = useRouter();
   const [step, setStep] = useState(1);
+  const { periodDates, togglePeriodDate, profile, setCycleLength, updateProfile } = useCycleData();
+  const { setNickname: saveNickname } = useUser();
 
   // Collected data
   const [nickname, setNickname] = useState("");
@@ -254,8 +255,6 @@ export default function LandingScreen() {
   const [healthHistory, setHealthHistory] = useState<string[]>([]);
   const [medicalCheckups, setMedicalCheckups] = useState<string | null>(null);
   const [medications, setMedications] = useState<string[]>([]);
-  const [selectedDates, setSelectedDates] = useState<string[]>([]);
-  const [cycleLength, setCycleLength] = useState(DEFAULT_CYCLE_LENGTH);
   const [typicalFlow, setTypicalFlow] = useState<string | null>(null);
   const [symptoms, setSymptoms] = useState<string[]>([]);
   const [moods, setMoods] = useState<string[]>([]);
@@ -272,6 +271,35 @@ export default function LandingScreen() {
   useEffect(() => {
     anim.run();
   }, [anim, step]);
+
+  useEffect(() => {
+    saveNickname(nickname);
+  }, [nickname, saveNickname]);
+
+  useEffect(() => {
+    updateProfile({
+      birthday,
+      cycleRegularity,
+      healthHistory,
+      medicalCheckups,
+      medications,
+      typicalFlow,
+      symptoms,
+      moods,
+      comfortFood,
+    });
+  }, [
+    birthday,
+    cycleRegularity,
+    healthHistory,
+    medicalCheckups,
+    medications,
+    moods,
+    comfortFood,
+    symptoms,
+    typicalFlow,
+    updateProfile,
+  ]);
 
   // ── Navigation helpers ──────────────────────────────────────────────────────
   const goNext = () => {
@@ -304,13 +332,10 @@ export default function LandingScreen() {
 
   // ── Calendar helpers (Step 8) ───────────────────────────────────────────────
   const toggleDate = (day: number) => {
-    const key = `${currentYear}-${currentMonth}-${day}`;
-    setSelectedDates((prev) =>
-      prev.includes(key) ? prev.filter((d) => d !== key) : [...prev, key],
-    );
+    togglePeriodDate(new Date(currentYear, currentMonth, day));
   };
   const isDateSelected = (day: number) =>
-    selectedDates.includes(`${currentYear}-${currentMonth}-${day}`);
+    !!periodDates[formatDateKey(new Date(currentYear, currentMonth, day))];
 
   const selectBirthday = (day: number) => {
     const chosen = new Date(birthdayViewYear, birthdayViewMonth, day);
@@ -588,20 +613,20 @@ export default function LandingScreen() {
               <TouchableOpacity
                 activeOpacity={1}
                 style={s.cycleLengthButton}
-                onPress={() => setCycleLength((value) => Math.max(MIN_CYCLE_LENGTH, value - 1))}
+                onPress={() => setCycleLength(profile.cycleLength - 1)}
               >
                 <Ionicons name="remove" size={22} color="#EAF4FF" />
               </TouchableOpacity>
 
               <View style={s.cycleLengthValueWrap}>
-                <Text style={s.cycleLengthValue}>{cycleLength}</Text>
+                <Text style={s.cycleLengthValue}>{profile.cycleLength}</Text>
                 <Text style={s.cycleLengthLabel}>days</Text>
               </View>
 
               <TouchableOpacity
                 activeOpacity={1}
                 style={s.cycleLengthButton}
-                onPress={() => setCycleLength((value) => Math.min(MAX_CYCLE_LENGTH, value + 1))}
+                onPress={() => setCycleLength(profile.cycleLength + 1)}
               >
                 <Ionicons name="add" size={22} color="#EAF4FF" />
               </TouchableOpacity>
