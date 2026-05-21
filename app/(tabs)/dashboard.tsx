@@ -2,13 +2,13 @@ import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Animated,
-  Dimensions,
-  Easing,
-  PanResponder,
-  StyleSheet,
-  Text,
-  View,
+    Animated,
+    Dimensions,
+    Easing,
+    PanResponder,
+    StyleSheet,
+    Text,
+    View,
 } from "react-native";
 import Svg, { Path } from "react-native-svg";
 

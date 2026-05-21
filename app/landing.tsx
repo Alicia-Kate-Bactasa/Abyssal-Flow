@@ -4,18 +4,18 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-    Animated,
-    Dimensions,
-    Keyboard,
-    KeyboardAvoidingView,
-    Platform,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    TouchableWithoutFeedback,
-    View,
+  Animated,
+  Dimensions,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  View,
 } from "react-native";
 
 const { width, height } = Dimensions.get("window");
@@ -389,15 +389,20 @@ export default function LandingScreen() {
         return (
           <Animated.View style={[s.birthdayPickerShell, { opacity: anim.bodyOpacity }]}> 
             <View style={s.birthdayField}>
-              <TextInput
-                style={s.birthdayFieldText}
-                placeholder="MM/DD/YY"
-                placeholderTextColor="rgba(255, 252, 252, 0.66)"
-                value={birthday}
-                onChangeText={setBirthday}
-                keyboardType="default"
-                returnKeyType="done"
-              />
+              <TouchableOpacity
+                activeOpacity={0.9}
+                onPress={() => setBirthdayPickerOpen((v) => !v)}
+                style={s.birthdayFieldTouch}
+              >
+                <Text
+                  style={[
+                    s.birthdayFieldText,
+                    birthday ? s.birthdayFieldValue : s.birthdayFieldPlaceholder,
+                  ]}
+                >
+                  {birthday || "MM/DD/YY"}
+                </Text>
+              </TouchableOpacity>
               <TouchableOpacity activeOpacity={1} onPress={() => setBirthdayPickerOpen((v) => !v)}>
                 <Ionicons name={birthdayPickerOpen ? "chevron-up" : "chevron-down"} size={18} color="#B5D6EE" />
               </TouchableOpacity>
@@ -1017,13 +1022,22 @@ const s = StyleSheet.create({
     borderWidth: 0.3,
     borderColor: "rgba(181,230,255,0.42)",
   },
-  birthdayFieldText: {
+  birthdayFieldTouch: {
     flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  birthdayFieldText: {
     fontFamily: Platform.OS === "ios" ? "Georgia" : "serif",
     fontSize: 15,
     color: "#FFFFFF",
+    width: "100%",
+  },
+  birthdayFieldValue: {
+    textAlign: "left",
   },
   birthdayFieldPlaceholder: {
+    textAlign: "center",
     color: "rgba(255, 252, 252, 0.66)",
   },
   birthdayCalendarCard: {
