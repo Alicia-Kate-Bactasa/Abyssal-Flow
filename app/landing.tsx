@@ -2,7 +2,7 @@ import WaveBackground from "@/components/WaveBackground";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
     Animated,
     Dimensions,
@@ -39,23 +39,6 @@ function getDaysInMonth(year: number, month: number) {
 }
 function getFirstDayOfMonth(year: number, month: number) {
   return new Date(year, month, 1).getDay();
-}
-function buildMonthWeeks(year: number, month: number) {
-  const firstDay = getFirstDayOfMonth(year, month);
-  const daysInMonth = getDaysInMonth(year, month);
-  const cells: (number | null)[] = [
-    ...Array(firstDay).fill(null),
-    ...Array.from({ length: daysInMonth }, (_, index) => index + 1),
-  ];
-
-  while (cells.length < 42) cells.push(null);
-
-  const weeks: (number | null)[][] = [];
-  for (let index = 0; index < 42; index += 7) {
-    weeks.push(cells.slice(index, index + 7));
-  }
-
-  return weeks;
 }
 function formatShortDate(date: Date) {
   const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -335,89 +318,11 @@ export default function LandingScreen() {
     setBirthdayPickerOpen(false);
   };
 
-  const parseUserBirthday = (str: string) => {
-    if (!str) return null;
-    // Accept MM/DD/YY or MM/DD/YYYY or ISO YYYY-MM-DD
-    const mmddyy = /^\s*(\d{1,2})\/(\d{1,2})\/(\d{2,4})\s*$/;
-    const iso = /^\s*(\d{4})-(\d{1,2})-(\d{1,2})\s*$/;
-    let m;
-    if ((m = str.match(mmddyy))) {
-      const month = parseInt(m[1], 10) - 1;
-      const day = parseInt(m[2], 10);
-      let year = parseInt(m[3], 10);
-      if (year < 100) {
-        // two-digit year -> assume 19xx/20xx nearest to current year
-        const thisYear = new Date().getFullYear() % 100;
-        const century = year <= thisYear ? 2000 : 1900;
-        year = century + year;
-      }
-      return new Date(year, month, day);
-    }
-    if ((m = str.match(iso))) {
-      const year = parseInt(m[1], 10);
-      const month = parseInt(m[2], 10) - 1;
-      const day = parseInt(m[3], 10);
-      return new Date(year, month, day);
-    }
-    const parsed = new Date(str);
-    return isNaN(parsed.getTime()) ? null : parsed;
-  };
+  // birthday parsing helpers removed
 
-  const renderBirthdayGrid = () => {
-    const weeks = buildMonthWeeks(birthdayViewYear, birthdayViewMonth);
-    const selectedDate = parseUserBirthday(birthday);
-    return weeks.map((week, weekIndex) => (
-      <View key={weekIndex} style={s.dayGridRow}>
-        {week.map((day, cellIndex) => {
-          if (!day) {
-            return <View key={`birthday-empty-${cellIndex}`} style={s.daySlot} />;
-          }
-          let isSelected = false;
-          if (selectedDate) {
-            isSelected =
-              selectedDate.getFullYear() === birthdayViewYear &&
-              selectedDate.getMonth() === birthdayViewMonth &&
-              selectedDate.getDate() === day;
-          } else {
-            isSelected = birthday === formatShortDate(new Date(birthdayViewYear, birthdayViewMonth, day));
-          }
-          return (
-            <TouchableOpacity
-              activeOpacity={1}
-              key={`${birthdayViewYear}-${birthdayViewMonth}-${day}`}
-              style={[s.daySlot, s.dayCell, isSelected && s.dayCellSelected]}
-              onPress={() => selectBirthday(day)}
-            >
-              <Text style={[s.dayNumber, isSelected && s.dayNumberSelected]}>{day}</Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
-    ));
-  };
+  // birthday dropdown removed — calendar rendering helpers no longer needed
 
-  const renderCalendarDays = () => {
-    const daysInMonth = getDaysInMonth(currentYear, currentMonth);
-    const firstDay = getFirstDayOfMonth(currentYear, currentMonth);
-    const cells: ReactElement[] = [];
-    for (let i = 0; i < firstDay; i++) {
-      cells.push(<View key={`e${i}`} style={s.dayCell} />);
-    }
-    for (let day = 1; day <= daysInMonth; day++) {
-      const sel = isDateSelected(day);
-      cells.push(
-        <TouchableOpacity
-          activeOpacity={1}
-          key={day}
-          style={[s.dayCell, sel && s.dayCellSelected]}
-          onPress={() => toggleDate(day)}
-        >
-          <Text style={[s.dayNumber, sel && s.dayNumberSelected]}>{day}</Text>
-        </TouchableOpacity>,
-      );
-    }
-    return cells;
-  };
+  
 
   // ── canProceed per step ─────────────────────────────────────────────────────
   const canProceed = (): boolean => {
@@ -483,64 +388,71 @@ export default function LandingScreen() {
       case 2:
         return (
           <Animated.View style={[s.birthdayPickerShell, { opacity: anim.bodyOpacity }]}> 
-            <TouchableOpacity
-              activeOpacity={1}
-              style={s.birthdayField}
-              onPress={() => setBirthdayPickerOpen((visible) => !visible)}
-            >
-              <Text style={[s.birthdayFieldText, !birthday && s.birthdayFieldPlaceholder]}>
-                {birthday || "MM/DD/YY"}
-              </Text>
-              <Ionicons
-                name={birthdayPickerOpen ? "chevron-up" : "chevron-down"}
-                size={18}
-                color="#B5D6EE"
+            <View style={s.birthdayField}>
+              <TextInput
+                style={s.birthdayFieldText}
+                placeholder="MM/DD/YY"
+                placeholderTextColor="rgba(255, 252, 252, 0.66)"
+                value={birthday}
+                onChangeText={setBirthday}
+                keyboardType="default"
+                returnKeyType="done"
               />
-            </TouchableOpacity>
+              <TouchableOpacity activeOpacity={1} onPress={() => setBirthdayPickerOpen((v) => !v)}>
+                <Ionicons name={birthdayPickerOpen ? "chevron-up" : "chevron-down"} size={18} color="#B5D6EE" />
+              </TouchableOpacity>
+            </View>
 
             {birthdayPickerOpen ? (
               <View style={s.birthdayCalendarCard}>
-                <View style={s.calendarHeader}>
-                  <TouchableOpacity
-                    activeOpacity={1}
-                    onPress={() => {
-                      if (birthdayViewMonth === 0) {
-                        setBirthdayViewMonth(11);
-                        setBirthdayViewYear((year) => year - 1);
-                      } else {
-                        setBirthdayViewMonth((month) => month - 1);
-                      }
-                    }}
-                    style={s.navButton}
-                  >
-                    <Text style={s.navArrow}>‹</Text>
-                  </TouchableOpacity>
-                  <Text style={s.monthLabel}>
-                    {MONTHS[birthdayViewMonth]} {birthdayViewYear}
-                  </Text>
-                  <TouchableOpacity
-                    activeOpacity={1}
-                    onPress={() => {
-                      if (birthdayViewMonth === 11) {
-                        setBirthdayViewMonth(0);
-                        setBirthdayViewYear((year) => year + 1);
-                      } else {
-                        setBirthdayViewMonth((month) => month + 1);
-                      }
-                    }}
-                    style={s.navButton}
-                  >
-                    <Text style={s.navArrow}>›</Text>
-                  </TouchableOpacity>
+                <View style={s.birthdayCalendarInner}>
+                  <View style={s.monthNav}>
+                    <TouchableOpacity activeOpacity={1} onPress={() => {
+                      if (birthdayViewMonth === 0) { setBirthdayViewMonth(11); setBirthdayViewYear((y) => y - 1); }
+                      else setBirthdayViewMonth((m) => m - 1);
+                    }}>
+                      <Text style={s.navArrow}>‹</Text>
+                    </TouchableOpacity>
+                    <Text style={s.monthTitle}>{MONTHS[birthdayViewMonth]} {birthdayViewYear}</Text>
+                    <TouchableOpacity activeOpacity={1} onPress={() => {
+                      if (birthdayViewMonth === 11) { setBirthdayViewMonth(0); setBirthdayViewYear((y) => y + 1); }
+                      else setBirthdayViewMonth((m) => m + 1);
+                    }}>
+                      <Text style={s.navArrow}>›</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  <View style={s.calRow}>
+                    {DAYS.map((d) => <Text key={d} style={s.dayHeader}>{d}</Text>)}
+                  </View>
+
+                  {(() => {
+                    const firstDay = getFirstDayOfMonth(birthdayViewYear, birthdayViewMonth);
+                    const daysInMonth = getDaysInMonth(birthdayViewYear, birthdayViewMonth);
+                    const cells: (number | null)[] = [...Array(firstDay).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => i + 1)];
+                    while (cells.length < 42) cells.push(null);
+                    const weeks: (number | null)[][] = [];
+                    for (let i = 0; i < 42; i += 7) weeks.push(cells.slice(i, i + 7));
+
+                    return weeks.map((week, wi) => (
+                      <View key={wi} style={s.calRow}>
+                        {week.map((day, di) => {
+                          if (day === null) return <View key={di} style={s.dayCell} />;
+                          const chosen = formatShortDate(new Date(birthdayViewYear, birthdayViewMonth, day));
+                          const isSel = birthday === chosen;
+                          return (
+                            <View key={di} style={s.dayCell}>
+                              <TouchableOpacity activeOpacity={1} onPress={() => selectBirthday(day)} style={[s.dayInner, isSel && s.dayPeriod]}>
+                                <Text style={[s.dayText, isSel && s.dayTextPeriod]}>{day}</Text>
+                              </TouchableOpacity>
+                            </View>
+                          );
+                        })}
+                      </View>
+                    ));
+                  })()}
+
                 </View>
-                <View style={s.dayHeaders}>
-                  {DAYS.map((day) => (
-                    <View key={day} style={s.dayHeaderSlot}>
-                      <Text style={s.dayHeader}>{day}</Text>
-                    </View>
-                  ))}
-                </View>
-                <View style={s.dayGrid}>{renderBirthdayGrid()}</View>
               </View>
             ) : null}
           </Animated.View>
@@ -619,33 +531,47 @@ export default function LandingScreen() {
       case 8:
         return (
           <Animated.View style={[s.calendar, { opacity: anim.bodyOpacity }]}>
-            <View style={s.calendarHeader}>
-              <TouchableOpacity
-                activeOpacity={1}
-                onPress={() => {
-                  if (currentMonth === 0) { setCurrentMonth(11); setCurrentYear((y) => y - 1); }
-                  else setCurrentMonth((m) => m - 1);
-                }}
-                style={s.navButton}
-              >
+            <View style={s.monthNav}>
+              <TouchableOpacity onPress={() => { if (currentMonth === 0) { setCurrentMonth(11); setCurrentYear((y) => y - 1); } else setCurrentMonth((m) => m - 1); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                 <Text style={s.navArrow}>‹</Text>
               </TouchableOpacity>
-              <Text style={s.monthLabel}>{MONTHS[currentMonth]} {currentYear}</Text>
-              <TouchableOpacity
-                activeOpacity={1}
-                onPress={() => {
-                  if (currentMonth === 11) { setCurrentMonth(0); setCurrentYear((y) => y + 1); }
-                  else setCurrentMonth((m) => m + 1);
-                }}
-                style={s.navButton}
-              >
+              <Text style={s.monthTitle}>{MONTHS[currentMonth]} {currentYear}</Text>
+              <TouchableOpacity onPress={() => { if (currentMonth === 11) { setCurrentMonth(0); setCurrentYear((y) => y + 1); } else setCurrentMonth((m) => m + 1); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                 <Text style={s.navArrow}>›</Text>
               </TouchableOpacity>
             </View>
-            <View style={s.dayHeaders}>
+
+            <View style={s.calRow}>
               {DAYS.map((d) => <Text key={d} style={s.dayHeader}>{d}</Text>)}
             </View>
-            <View style={s.dayGrid}>{renderCalendarDays()}</View>
+
+            {(() => {
+              const firstDay = getFirstDayOfMonth(currentYear, currentMonth);
+              const daysInMonth = getDaysInMonth(currentYear, currentMonth);
+              const cells: (number | null)[] = [...Array(firstDay).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => i + 1)];
+              while (cells.length < 42) cells.push(null);
+              const weeks: (number | null)[][] = [];
+              for (let i = 0; i < 42; i += 7) weeks.push(cells.slice(i, i + 7));
+
+              return weeks.map((week, wi) => (
+                <View key={wi} style={s.calRow}>
+                  {week.map((day, di) => {
+                    const sel = day !== null && isDateSelected(day);
+                    return (
+                      <View key={di} style={s.dayCell}>
+                        {day !== null ? (
+                          <TouchableOpacity activeOpacity={1} onPress={() => toggleDate(day)} style={[s.dayInner, sel && s.dayPeriod]}>
+                            <Text style={[s.dayText, sel && s.dayTextPeriod]}>{day}</Text>
+                          </TouchableOpacity>
+                        ) : (
+                          <View style={s.dayInner} />
+                        )}
+                      </View>
+                    );
+                  })}
+                </View>
+              ));
+            })()}
           </Animated.View>
         );
 
@@ -1030,7 +956,10 @@ const s = StyleSheet.create({
   calendar: {
     backgroundColor: "transparent",
     borderRadius: 24,
-    padding: 20,
+    padding: 12,
+    paddingHorizontal: 12,
+    minHeight: 260,
+    alignItems: "center",
     borderWidth: 0.7,
     borderColor: "rgba(181,230,255,0.42)",
     shadowColor: "transparent",
@@ -1040,8 +969,8 @@ const s = StyleSheet.create({
     elevation: 0,
     width: "100%",
   },
-  calendarHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 },
-  navButton: { padding: 4 },
+  calendarHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 },
+  navButton: { padding: 2 },
   navArrow: { color: "#B5BEC6", fontSize: 22, fontWeight: "300", lineHeight: 22 },
   monthLabel: {
     fontFamily: Platform.OS === "ios" ? "Georgia" : "serif",
@@ -1050,30 +979,29 @@ const s = StyleSheet.create({
     color: "#FFFFFF",
     letterSpacing: 0.5,
   },
-  dayHeaders: { flexDirection: "row", justifyContent: "space-between", marginBottom: 8 },
-  dayHeaderSlot: { width: 22, alignItems: "center" },
+  dayHeaders: { flexDirection: "row", marginBottom: 6, width: "86%", alignSelf: "center" },
+  dayHeaderSlot: { width: "14.2857%", alignItems: "center" },
   dayHeader: {
-    width: 22,
     textAlign: "center",
-    fontFamily: Platform.OS === "ios" ? "Georgia" : "serif",
-    fontSize: 7,
-    fontWeight: "600",
-    letterSpacing: 1.5,
-    color: "#B5BEC6",
-  },
-  dayGrid: { rowGap: 6 },
-  dayGridRow: { flexDirection: "row", alignItems: "center", marginBottom: 4 },
-  daySlot: { width: 22, alignItems: "center", justifyContent: "center" },
-  dayCell: { width: 22, height: 22, borderRadius: 11, justifyContent: "center", alignItems: "center", borderWidth: 0.7, borderColor: "transparent" },
-  dayCellSelected: { backgroundColor: "#ff4343" },
-  dayNumber: {
     fontFamily: Platform.OS === "ios" ? "Georgia" : "serif",
     fontSize: 8,
     fontWeight: "600",
-    color: "#FFFFFF",
-    textAlign: "center",
+    letterSpacing: 1.2,
+    color: "#B5BEC6",
   },
-  dayNumberSelected: { color: "#FFFFFF" },
+  dayGrid: { rowGap: 6, width: "86%", alignSelf: "center", flexDirection: "row", flexWrap: "wrap", justifyContent: "flex-start" },
+  dayGridRow: { flexDirection: "row", alignItems: "center", marginBottom: 2 },
+
+  // modal-like calendar styles (used for Step 8)
+  monthNav: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8, width: "86%", alignSelf: "center" },
+  monthTitle: { fontFamily: Platform.OS === "ios" ? "Georgia" : "serif", fontSize: 15, fontWeight: "600", color: "#E8F4FF", letterSpacing: 0.3 },
+  calRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 6, width: "86%", alignSelf: "center" },
+  dayCell: { flex: 1, alignItems: "center", paddingVertical: 4 },
+  dayInner: { width: 30, height: 30, borderRadius: 15, alignItems: "center", justifyContent: "center" },
+  dayPeriod: { backgroundColor: "#ff4343" },
+  dayPredicted: { backgroundColor: "rgba(217, 48, 37, 0.25)", borderWidth: 1, borderColor: "rgba(217, 48, 37, 0.4)" },
+  dayText: { color: "#C8D8EC", fontSize: 13 },
+  dayTextPeriod: { color: "#FFF", fontWeight: "700" },
 
   birthdayPickerShell: {
     width: "100%",
@@ -1099,18 +1027,24 @@ const s = StyleSheet.create({
     color: "rgba(255, 252, 252, 0.66)",
   },
   birthdayCalendarCard: {
-    marginTop: 10,
-    borderRadius: 20,
-    padding: 10,
+    marginTop: 6,
+    borderRadius: 18,
+    paddingVertical: 20,
+    paddingHorizontal: 10,
+    minHeight: 220,
     borderWidth: 0.3,
     borderColor: "rgba(181,230,255,0.22)",
-    backgroundColor: "rgba(9, 28, 58, 0.82)",
+    backgroundColor: "rgba(11, 43, 96, 0.82)",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.22,
     shadowRadius: 18,
     elevation: 8,
     overflow: "hidden",
+  },
+  birthdayCalendarInner: {
+    width: "100%",
+    alignItems: "center",
   },
   cycleLengthShell: {
     width: "100%",
