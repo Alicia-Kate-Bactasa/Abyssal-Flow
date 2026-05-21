@@ -1,7 +1,8 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
+  Dimensions,
   Modal,
   Pressable,
   ScrollView,
@@ -11,6 +12,38 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+const { width, height } = Dimensions.get("window");
+
+const TinySpeck = ({ top, left, opacity }: { top: number; left: number; opacity: number }) => {
+  return <View style={[styles.speck, { top, left, opacity }]} />;
+};
+
+const BackgroundSparkles = () => {
+  const specks = useMemo(
+      () =>
+        Array.from({ length: 60 }, (_, idx) => ({
+          id: idx,
+          top: Math.random() * height,
+          left: Math.random() * width,
+          opacity: 0.25 + Math.random() * 0.45,
+        })),
+    [],
+  );
+
+  return (
+    <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
+      {specks.map((speck) => (
+        <TinySpeck
+          key={speck.id}
+          top={speck.top}
+          left={speck.left}
+          opacity={speck.opacity}
+        />
+      ))}
+    </View>
+  );
+};
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -24,6 +57,7 @@ export default function ProfileScreen() {
 
   return (
     <LinearGradient colors={["#061736", "#1E3A78"]} style={styles.container}>
+      <BackgroundSparkles />
       <ScrollView
         contentContainerStyle={[
           styles.content,
@@ -100,6 +134,18 @@ export default function ProfileScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  speck: {
+    position: "absolute",
+    width: 1,
+    height: 1,
+    borderRadius: 0.5,
+    backgroundColor: "rgba(255,255,255,0.92)",
+    shadowColor: "rgba(255,255,255,0.9)",
+    shadowOffset: { width: 0, height: 0 },
+    shadowRadius: 10,
+    shadowOpacity: 1,
+    elevation: 1,
+  },
   content: {
     paddingHorizontal: 24,
     alignItems: "center",

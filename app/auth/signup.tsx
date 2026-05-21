@@ -2,8 +2,9 @@ import WaveBackground from "@/components/WaveBackground";
 import { OceanColors } from "@/constants/theme";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
+  Dimensions,
   Image,
   KeyboardAvoidingView,
   Modal,
@@ -27,6 +28,27 @@ export default function SignupScreen() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [termsAlertVisible, setTermsAlertVisible] = useState(false);
+
+  const { width, height } = Dimensions.get("window");
+
+  const TinySpeck = ({ top, left, opacity }: { top: number; left: number; opacity: number }) => {
+    return <View style={[styles.speck, { top, left, opacity }]} />;
+  };
+
+  const BackgroundSparkles = () => {
+    const specks = useMemo(
+      () => Array.from({ length: 60 }, (_, idx) => ({ id: idx, top: Math.random() * height, left: Math.random() * width, opacity: 0.25 + Math.random() * 0.45 })),
+      [],
+    );
+
+    return (
+      <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
+        {specks.map((s) => (
+          <TinySpeck key={s.id} top={s.top} left={s.left} opacity={s.opacity} />
+        ))}
+      </View>
+    );
+  };
 
   const handleSignup = async () => {
     if (!termsAccepted) {
@@ -59,6 +81,7 @@ export default function SignupScreen() {
   return (
     <View style={styles.container}>
       <WaveBackground />
+      <BackgroundSparkles />
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={styles.keyboardContainer}
@@ -295,6 +318,19 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     position: "absolute",
     top: 153,
+  },
+
+  speck: {
+    position: "absolute",
+    width: 1,
+    height: 1,
+    borderRadius: 0.5,
+    backgroundColor: "rgba(255,255,255,0.92)",
+    shadowColor: "rgba(255,255,255,0.9)",
+    shadowOffset: { width: 0, height: 0 },
+    shadowRadius: 10,
+    shadowOpacity: 1,
+    elevation: 1,
   },
   heading: {
     fontSize: 28,

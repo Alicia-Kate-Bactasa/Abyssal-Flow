@@ -1,6 +1,6 @@
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
   Dimensions,
@@ -19,8 +19,7 @@ const CYCLE_LENGTH = 28;
 const MOON_SIZE = width * 0.74;
 const WRAPPER_SIZE = width * 1.6;
 const DAY_CIRCLE_RADIUS = MOON_SIZE / 2 + 25;
-const INDICATOR_SIZE = 30;
-const INDICATOR_OFFSET = 8;
+// indicator constants removed — indicator hidden per UX request
 const MOON_INSET = 8;
 
 
@@ -50,27 +49,6 @@ const getPhaseKey = (cycleDay: number): PhaseKey => {
   if (cycleDay <= 13) return "follicular";
   if (cycleDay <= 17) return "ovulation";
   return "luteal";
-};
-
-const PHASE_ORDER: PhaseKey[] = [
-  "menstrual",
-  "follicular",
-  "ovulation",
-  "luteal",
-];
-
-const PHASE_RANGES: Record<PhaseKey, [number, number]> = {
-  menstrual: [1, 5],
-  follicular: [6, 13],
-  ovulation: [14, 17],
-  luteal: [18, 28],
-};
-
-const getNextPhaseRange = (cycleDay: number) => {
-  const current = getPhaseKey(cycleDay);
-  const nextIndex = (PHASE_ORDER.indexOf(current) + 1) % PHASE_ORDER.length;
-  const nextKey = PHASE_ORDER[nextIndex];
-  return { key: nextKey, range: PHASE_RANGES[nextKey] };
 };
 
 const WAVE_X = {
@@ -151,6 +129,42 @@ const PHASES: Record<PhaseKey, PhaseConfig> = {
     waveColors: ["#1E5E8F", "#0B3B5E"],
     wavePoints: [120, 70, 175, 125, 75, 155, 120],
   },
+};
+
+const TinySpeck = ({
+  top,
+  left,
+  opacity,
+  size,
+}: {
+  top: number;
+  left: number;
+  opacity: number;
+  size: number;
+}) => {
+  return <View style={[styles.speck, { top, left, opacity, width: size, height: size }]} />;
+};
+
+const BackgroundSparkles = () => {
+  const specks = useMemo(
+    () =>
+      Array.from({ length: 48 }, (_, idx) => ({
+        id: idx,
+        top: Math.random() * height * 0.88,
+        left: Math.random() * width,
+        opacity: 0.22 + Math.random() * 0.33,
+        size: 1 + Math.random() * 0.9,
+      })),
+    [],
+  );
+
+  return (
+    <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
+      {specks.map((speck) => (
+        <TinySpeck key={speck.id} top={speck.top} left={speck.left} opacity={speck.opacity} size={speck.size} />
+      ))}
+    </View>
+  );
 };
 
 // ==========================================
@@ -308,6 +322,8 @@ const CircularCalendarDial = ({
     (fromVelocityDegPerMs = 0) => {
       const raw = currentAngleRef.current;
       const snapped = Math.round(raw / angleSlice) * angleSlice;
+      const normalized = normalizeAngleToMonth(snapped);
+      const snappedDay = normalized.dayIndex + 1;
 
       Animated.spring(rotationAngle, {
         toValue: snapped,
@@ -317,7 +333,6 @@ const CircularCalendarDial = ({
         friction: 10,
       }).start(({ finished }) => {
         if (finished) {
-          const normalized = normalizeAngleToMonth(snapped);
           if (
             normalized.month !== currentMonth ||
             normalized.year !== currentYear
@@ -327,18 +342,21 @@ const CircularCalendarDial = ({
             rotationAngle.setValue(normalized.angle);
             currentAngleRef.current = normalized.angle;
           }
+          onDayChange(snappedDay);
+          onDateChange(new Date(normalized.year, normalized.month, snappedDay));
           startInactivityTimer();
         }
       });
     },
     [
       angleSlice,
-      currentMonth,
-      currentYear,
-      onDateChange,
-      normalizeAngleToMonth,
-      rotationAngle,
-      startInactivityTimer,
+        currentMonth,
+        currentYear,
+        onDateChange,
+        onDayChange,
+        normalizeAngleToMonth,
+        rotationAngle,
+        startInactivityTimer,
     ],
   );
 
@@ -429,7 +447,6 @@ const CircularCalendarDial = ({
 
   const generateDayElements = () => {
     const days = [];
-    const nextPhase = getNextPhaseRange(anchorCycleDay);
     for (let day = 1; day <= daysInMonth; day++) {
       const angle = (day - 1) * angleSlice - 90;
       const radians = (angle * Math.PI) / 180;
@@ -438,9 +455,6 @@ const CircularCalendarDial = ({
 
       const dateForDay = new Date(currentYear, currentMonth, day);
       const dayName = WEEKDAYS[dateForDay.getDay()];
-      const cycleDay = getCycleDay(day);
-      const isNextPhaseDay =
-        cycleDay >= nextPhase.range[0] && cycleDay <= nextPhase.range[1];
       const isActiveDay = day === activeDay;
 
       days.push(
@@ -460,11 +474,8 @@ const CircularCalendarDial = ({
           ]}
         >
           <Text style={styles.weekdayLabel}>{dayName}</Text>
-          <View style={styles.dayNumberCircle}>
+          <View style={[styles.dayNumberCircle, isActiveDay && styles.dayNumberCircleActive]}>
             <Text style={styles.dayNumberText}>{day}</Text>
-            {isNextPhaseDay && !isActiveDay ? (
-              <View style={styles.nextPhaseMarker} />
-            ) : null}
           </View>
         </View>,
       );
@@ -474,23 +485,6 @@ const CircularCalendarDial = ({
 
   return (
     <View style={styles.dialContainer}>
-      <View
-        style={[
-          styles.dialIndicator,
-          {
-            width: INDICATOR_SIZE,
-            height: INDICATOR_SIZE,
-            borderRadius: INDICATOR_SIZE / 2,
-            top:
-              WRAPPER_SIZE / 2 -
-              DAY_CIRCLE_RADIUS -
-              INDICATOR_SIZE / 2 +
-              INDICATOR_OFFSET,
-            left: WRAPPER_SIZE / 2 - INDICATOR_SIZE / 2,
-          },
-        ]}
-        pointerEvents="none"
-      />
       <View
         style={[
           styles.moonGlowCore,
@@ -609,6 +603,8 @@ export default function Dashboard() {
         />
       </View>
 
+      <BackgroundSparkles />
+
       <View style={styles.waveLayer} pointerEvents="none">
         <Svg width={width} height={180} viewBox={`0 0 ${width} 180`}>
           <Path d={wavePath} fill={phase.waveColors[0]} />
@@ -664,6 +660,16 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+  speck: {
+    position: "absolute",
+    borderRadius: 0.5,
+    backgroundColor: "rgba(255,255,255,0.92)",
+    shadowColor: "rgba(255,255,255,0.95)",
+    shadowOffset: { width: 0, height: 0 },
+    shadowRadius: 8,
+    shadowOpacity: 0.65,
+    elevation: 1,
+  },
   contentOverlay: {
     flex: 1,
     alignItems: "center",
@@ -717,15 +723,9 @@ const styles = StyleSheet.create({
   },
   dialIndicator: {
     position: "absolute",
-    width: INDICATOR_SIZE,
-    height: INDICATOR_SIZE,
-    borderRadius: INDICATOR_SIZE / 2,
-    borderWidth: 2,
-    borderColor: "rgba(255,255,255,0.4)",
-    backgroundColor: "transparent",
-    top:
-      WRAPPER_SIZE / 2 - DAY_CIRCLE_RADIUS - INDICATOR_SIZE / 2 + INDICATOR_OFFSET,
-    left: WRAPPER_SIZE / 2 - INDICATOR_SIZE / 2,
+    width: 0,
+    height: 0,
+    opacity: 0,
   },
   calendarMoonWrapper: {
     width: WRAPPER_SIZE,
@@ -766,14 +766,12 @@ const styles = StyleSheet.create({
     borderRadius: 17,
     justifyContent: "center",
     alignItems: "center",
+    backgroundColor: "transparent",
   },
-  nextPhaseMarker: {
-    position: "absolute",
-    bottom: 1,
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: "rgba(255,255,255,0.5)",
+  dayNumberCircleActive: {
+    backgroundColor: "transparent",
+    borderWidth: 0.3,
+    borderColor: "rgba(255,255,255,0.85)",
   },
   dayNumberText: {
     color: "white",

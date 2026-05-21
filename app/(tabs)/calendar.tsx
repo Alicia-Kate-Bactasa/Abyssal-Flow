@@ -1,20 +1,21 @@
 import { formatDateKey, parseDateKey, useCycleData } from "@/hooks/use-cycle-store";
-import { Ionicons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  Animated,
   Dimensions,
+  FlatList,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-const { width } = Dimensions.get("window");
-const WEEKDAYS = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
+const { width, height } = Dimensions.get("window");
+const WEEKDAYS = ["S", "M", "T", "W", "T", "F", "S"];
 
 const buildWeeks = (year: number, month: number) => {
   const firstDay = new Date(year, month, 1).getDay();
@@ -76,6 +77,117 @@ const buildPeriodRuns = (keys: string[]) => {
   return runs;
 };
 
+const TinySpeck = ({ top, left, opacity }: { top: number, left: number, opacity: number }) => {
+  return <View style={[styles.speck, { top, left, opacity }]} />;
+};
+
+const BackgroundSparkles = () => {
+  const specks = useMemo(() => {
+    return Array.from({ length: 60 }, (_, idx) => ({
+      id: idx,
+      top: Math.random() * height,
+      left: Math.random() * width,
+      opacity: 0.25 + Math.random() * 0.45,
+    }));
+  }, []);
+
+  return (
+    <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
+      {specks.slice(0, 20).map((s) => (
+        <TinySpeck key={s.id} top={s.top} left={s.left} opacity={s.opacity} />
+      ))}
+    </View>
+  );
+};
+
+type MonthItemProps = {
+  year: number;
+  month: number;
+  draftDates: Record<string, true>;
+  predictedDates: Record<string, true>;
+  onToggleDay: (year: number, month: number, day: number) => void;
+};
+
+const MonthItem = React.memo(({ year, month, draftDates, predictedDates, onToggleDay }: MonthItemProps) => {
+  const weeks = useMemo(() => buildWeeks(year, month), [month, year]);
+
+  return (
+    <View style={styles.monthGrid}>
+      {weeks.map((week, index) => (
+        <View key={index} style={styles.weekRow}>
+          {week.map((cell, cellIndex) => {
+            const targetDate = new Date(year, month + cell.monthOffset, cell.day);
+            const key = formatDateKey(targetDate);
+            const isPeriod = !!draftDates[key];
+            const isPredicted = predictedDates[key] && !isPeriod;
+
+            return (
+              <Pressable
+                key={`${index}-${cellIndex}`}
+                style={[
+                  styles.dayChip,
+                  isPredicted && styles.dayChipPredicted,
+                  isPeriod && styles.dayChipPeriod,
+                ]}
+                onPress={() => onToggleDay(targetDate.getFullYear(), targetDate.getMonth(), cell.day)}
+              >
+                <Text
+                  style={[
+                    styles.dayText,
+                    !cell.isCurrentMonth && styles.outOfMonthText,
+                    isPredicted && styles.dayTextPredicted,
+                    isPeriod && styles.dayTextPeriod,
+                  ]}
+                >
+                  {cell.day}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      ))}
+    </View>
+  );
+});
+
+MonthItem.displayName = "MonthItem";
+
+const PulsingHeading = ({ style, children }: { style: any; children: React.ReactNode }) => {
+  const glowAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(glowAnim, {
+          toValue: 5,
+          duration: 2500,
+          useNativeDriver: false,
+        }),
+        Animated.timing(glowAnim, {
+          toValue: 1,
+          duration: 2500,
+          useNativeDriver: false,
+        }),
+      ])
+    ).start();
+  }, [glowAnim]);
+
+  return (
+    <Animated.Text
+      style={[
+        style,
+        {
+          textShadowColor: "rgba(255, 255, 255, 0.6)",
+          textShadowOffset: { width: 0, height: 0 },
+          textShadowRadius: glowAnim,
+        },
+      ]}
+    >
+      {children}
+    </Animated.Text>
+  );
+};
+
 export default function CalendarScreen() {
   const insets = useSafeAreaInsets();
   const {
@@ -88,7 +200,9 @@ export default function CalendarScreen() {
   
   const [activeSegment, setActiveSegment] = useState<"calendar" | "pattern">("calendar");
   const [draftDates, setDraftDates] = useState<Record<string, true>>(periodDates);
-  const [currentViewDate, setCurrentViewDate] = useState(new Date());
+  const [currentHeaderDate, setCurrentHeaderDate] = useState(new Date());
+
+  const slideAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     setDraftDates(periodDates);
@@ -115,12 +229,14 @@ export default function CalendarScreen() {
         (date.getTime() - prev.getTime()) / (1000 * 60 * 60 * 24),
       );
       return {
-        label: `${formatMonthLabel(date.getFullYear(), date.getMonth())}: ${length} days`,
+        label: `${formatMonthLabel(date.getFullYear(), date.getMonth())} Cycle`,
+        length: length,
       };
     });
   }, [periodKeys]);
 
-  const toggleDraftDate = (targetYear: number, targetMonth: number, day: number) => {
+  const toggleDraftDate = useCallback((targetYear: number, targetMonth: number, day: number) => {
+    Haptics.selectionAsync();
     const key = formatDateKey(new Date(targetYear, targetMonth, day));
     setDraftDates((prev) => {
       const next = { ...prev };
@@ -131,299 +247,371 @@ export default function CalendarScreen() {
       }
       return next;
     });
-  };
+  }, []);
 
   const handleSave = () => {
     replacePeriodDates(draftKeys);
     recalcPredictions();
   };
 
-  const handlePrevMonth = () => {
-    setCurrentViewDate((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
+  const handleTabSwitch = (tab: "calendar" | "pattern") => {
+    if (activeSegment === tab) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setActiveSegment(tab);
+    Animated.spring(slideAnim, {
+      toValue: tab === "calendar" ? 0 : 1,
+      useNativeDriver: false,
+      tension: 40,
+      friction: 7,
+    }).start();
   };
 
-  const handleNextMonth = () => {
-    setCurrentViewDate((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
-  };
+  const monthsData = useMemo(() => {
+    const data = [];
+    const today = new Date();
+    for (let i = -12; i <= 12; i++) {
+      data.push({
+        id: `month-${i}`,
+        year: today.getFullYear(),
+        month: today.getMonth() + i,
+      });
+    }
+    return data;
+  }, []);
 
-  const renderCalendar = () => {
-    const year = currentViewDate.getFullYear();
-    const month = currentViewDate.getMonth();
-    const monthLabel = formatMonthLabel(year, month);
-    const weeks = buildWeeks(year, month);
+  const onViewableItemsChanged = useCallback(({ viewableItems }: any) => {
+    if (viewableItems && viewableItems.length > 0) {
+      const item = viewableItems[0].item;
+      setCurrentHeaderDate(new Date(item.year, item.month, 1));
+    }
+  }, []);
 
-    return (
-      <View style={styles.monthPage}>
-        <View style={styles.monthCard}>
-          <View style={styles.monthHeader}>
-            <TouchableOpacity onPress={handlePrevMonth} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-              <Ionicons name="chevron-back" size={20} color="#4EA6FF" />
-            </TouchableOpacity>
-            
-            <Text style={styles.monthTitle}>{monthLabel}</Text>
-            
-            <TouchableOpacity onPress={handleNextMonth} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-              <Ionicons name="chevron-forward" size={20} color="#4EA6FF" />
-            </TouchableOpacity>
-          </View>
+  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 50 }).current;
 
-          <View style={styles.weekRow}>
-            {WEEKDAYS.map((label) => (
-              <Text key={label} style={styles.weekday}>
-                {label}
-              </Text>
-            ))}
-          </View>
-          
-          {weeks.map((week, index) => (
-            <View key={index} style={styles.weekRow}>
-              {week.map((cell, cellIndex) => {
-                const targetDate = new Date(year, month + cell.monthOffset, cell.day);
-                const key = formatDateKey(targetDate);
-                const isPeriod = !!draftDates[key];
-                const isPredicted = predictedDates[key] && !isPeriod;
-                
-                return (
-                  <Pressable
-                    key={key}
-                    style={[
-                      styles.dayCell,
-                      isPredicted && styles.predictedDay,
-                      isPeriod && styles.periodDay,
-                    ]}
-                    onPress={() => toggleDraftDate(targetDate.getFullYear(), targetDate.getMonth(), cell.day)}
-                  >
-                    <Text
-                      style={[
-                        styles.dayText,
-                        !cell.isCurrentMonth && styles.outOfMonthText,
-                        isPredicted && styles.predictedDayText,
-                        isPeriod && styles.periodDayText,
-                      ]}
-                    >
-                      {cell.day}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          ))}
-        </View>
-      </View>
-    );
-  };
+  const renderMonthItem = useCallback(
+    ({ item }: { item: { year: number; month: number } }) => (
+      <MonthItem
+        year={item.year}
+        month={item.month}
+        draftDates={draftDates}
+        predictedDates={predictedDates}
+        onToggleDay={toggleDraftDate}
+      />
+    ),
+    [draftDates, predictedDates, toggleDraftDate],
+  );
 
   return (
-    <LinearGradient colors={["#04122B", "#1A2E5A"]} style={styles.container}>
-      <ScrollView
-        contentContainerStyle={[
-          styles.content,
-          { paddingTop: 20 + insets.top, paddingBottom: 140 + insets.bottom },
-        ]}
-      >
-        <Text style={styles.headerTitle}>Calendar</Text>
+    <LinearGradient colors={["#061736", "#1E3A78"]} style={styles.container}>
+      <BackgroundSparkles />
+      <View style={[styles.content, { paddingTop: 20 + insets.top, paddingBottom: insets.bottom }]}>
+        
+        <PulsingHeading style={styles.headerTitleGlow}>Cosmic Chart</PulsingHeading>
 
         <View style={styles.segmentedControl}>
-          <Pressable
-            onPress={() => setActiveSegment("calendar")}
-            style={[styles.segment, activeSegment === "calendar" && styles.segmentActive]}
-          >
-            <Text style={activeSegment === "calendar" ? styles.segmentTextActive : styles.segmentText}>
-              Calendar
-            </Text>
+          <Animated.View
+            style={[
+              styles.segmentActiveBg,
+              {
+                left: slideAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: ["2%", "48%"],
+                }),
+              },
+            ]}
+          />
+          <Pressable onPress={() => handleTabSwitch("calendar")} style={styles.segment}>
+            <Text style={styles.segmentText}>Tide Tracker</Text>
           </Pressable>
-          <Pressable
-            onPress={() => setActiveSegment("pattern")}
-            style={[styles.segment, activeSegment === "pattern" && styles.segmentActive]}
-          >
-            <Text style={activeSegment === "pattern" ? styles.segmentTextActive : styles.segmentText}>
-              Cycle Pattern
-            </Text>
+          <Pressable onPress={() => handleTabSwitch("pattern")} style={styles.segment}>
+            <Text style={styles.segmentText}>Deep Patterns</Text>
           </Pressable>
         </View>
 
         <View style={styles.analyticsCard}>
           <View style={styles.analyticsRow}>
             <Text style={styles.analyticsLabel}>Average cycle length</Text>
-            <Text style={styles.analyticsValue}>{cycleStats.avgCycleLength} days</Text>
+            <Text style={styles.analyticsValue}>{cycleStats.avgCycleLength} tides</Text>
           </View>
           <View style={styles.analyticsRow}>
-            <Text style={styles.analyticsLabel}>Average period length</Text>
-            <Text style={styles.analyticsValue}>{cycleStats.avgPeriodLength} days</Text>
+            <Text style={styles.analyticsLabel}>Average flow duration</Text>
+            <Text style={styles.analyticsValue}>{cycleStats.avgPeriodLength} tides</Text>
           </View>
         </View>
 
         {activeSegment === "calendar" ? (
           <View style={styles.calendarWrapper}>
-            {renderCalendar()}
-            {hasChanges ? (
+            <View style={styles.calendarCard}>
+              <View style={styles.monthHeader}>
+                <PulsingHeading style={styles.monthLabelGlow}>
+                  {formatMonthLabel(currentHeaderDate.getFullYear(), currentHeaderDate.getMonth())}
+                </PulsingHeading>
+              </View>
+
+              <View style={styles.weekdayRow}>
+                {WEEKDAYS.map((label, idx) => (
+                  <Text key={`${label}-${idx}`} style={styles.weekday}>
+                    {label}
+                  </Text>
+                ))}
+              </View>
+
+              <View style={styles.flatListContainer}>
+                <FlatList
+                  data={monthsData}
+                  keyExtractor={(item) => item.id}
+                  renderItem={renderMonthItem}
+                  showsVerticalScrollIndicator={false}
+                  initialScrollIndex={12}
+                  getItemLayout={(data, index) => ({ length: 240, offset: 240 * index, index })}
+                  onViewableItemsChanged={onViewableItemsChanged}
+                  viewabilityConfig={viewabilityConfig}
+                  removeClippedSubviews
+                  windowSize={5}
+                  initialNumToRender={3}
+                  maxToRenderPerBatch={3}
+                  updateCellsBatchingPeriod={50}
+                />
+              </View>
+            </View>
+
+            {hasChanges && (
               <Pressable style={styles.saveButton} onPress={handleSave}>
-                <Text style={styles.saveButtonText}>Save Changes</Text>
+                <Text style={styles.saveButtonText}>Seal Cosmic Path</Text>
               </Pressable>
-            ) : null}
+            )}
           </View>
         ) : (
-          <>
-            <Text style={styles.sectionTitle}>Cycle Pattern</Text>
+          <ScrollView style={styles.patternWrapper} showsVerticalScrollIndicator={false}>
+            <PulsingHeading style={styles.sectionHeaderGlow}>Echoes of Past Tides</PulsingHeading>
             {cyclePatternRows.length ? (
               cyclePatternRows.map((row, index) => (
                 <View key={`${row.label}-${index}`} style={styles.cycleRow}>
                   <Text style={styles.cycleLabel}>{row.label}</Text>
+                  <View style={styles.cycleLabelRight}>
+                    <Text style={styles.cycleValue}>{row.length} tides</Text>
+                  </View>
                   <View style={styles.cycleBar}>
-                    <View style={styles.cycleRed} />
-                    <View style={styles.cycleBlue} />
+                    <LinearGradient
+                      colors={["rgba(255,255,255,0.3)", "rgba(255,255,255,0.05)"]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                      style={[styles.cycleGlowTrack, { flex: 2 }]}
+                    />
+                    <LinearGradient
+                      colors={["rgba(255,255,255,0.02)", "transparent"]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                      style={{ flex: Math.max(1, row.length - 2) }}
+                    />
                   </View>
                 </View>
               ))
             ) : (
               <Text style={styles.emptyStateText}>
-                Log at least two cycles to see history.
+                Chart at least two tides to reveal history.
               </Text>
             )}
-          </>
+          </ScrollView>
         )}
-      </ScrollView>
+      </View>
     </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  content: {
-    paddingHorizontal: 0, 
+  content: { flex: 1 },
+  speck: {
+    position: "absolute",
+    width: 1.5,
+    height: 1.5,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 1,
+    shadowColor: "#FFFFFF",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 1,
+    shadowRadius: 3,
   },
-  headerTitle: {
+  headerTitleGlow: {
+    fontFamily: "Georgia",
+    fontSize: 16,
+    letterSpacing: 0.5,
+    marginBottom: 20,
+    textAlign: "center",
     color: "#FFFFFF",
-    fontSize: 20,
-    marginBottom: 12,
-    paddingHorizontal: 20,
+  },
+  sectionHeaderGlow: {
+    fontFamily: "Georgia",
+    fontSize: 13,
+    marginBottom: 16,
+    color: "#FFFFFF",
+  },
+  monthLabelGlow: {
+    fontFamily: "Georgia",
+    fontSize: 14,
+    textAlign: "center",
+    color: "#FFFFFF",
   },
   segmentedControl: {
     flexDirection: "row",
-    backgroundColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "rgba(23,44,92,0.4)",
     borderRadius: 999,
     padding: 4,
     marginBottom: 16,
     marginHorizontal: 20,
+    borderWidth: 0.3,
+    borderColor: "rgba(255,255,255,0.3)",
+    position: "relative",
+  },
+  segmentActiveBg: {
+    position: "absolute",
+    width: "50%",
+    height: "100%",
+    top: 4,
+    backgroundColor: "rgba(255,255,255,0.12)",
+    borderRadius: 999,
+    borderWidth: 0.3,
+    borderColor: "rgba(255,255,255,0.35)",
   },
   segment: {
     flex: 1,
-    paddingVertical: 6,
-    borderRadius: 999,
+    paddingVertical: 10,
     alignItems: "center",
+    justifyContent: "center",
+    zIndex: 2,
   },
-  segmentActive: {
-    backgroundColor: "rgba(255,255,255,0.15)",
-  },
-  segmentText: { color: "rgba(255,255,255,0.6)", fontSize: 12 },
-  segmentTextActive: { color: "#FFFFFF", fontSize: 12 },
+  segmentText: { color: "#FFFFFF", fontSize: 12 },
   analyticsCard: {
-    backgroundColor: "rgba(19,33,75,0.7)",
-    borderRadius: 20,
-    padding: 14,
-    marginBottom: 16,
+    backgroundColor: "rgba(23,44,92,0.5)",
+    borderRadius: 22,
+    padding: 16,
+    marginBottom: 20,
     marginHorizontal: 20,
+    borderWidth: 0.3,
+    borderColor: "rgba(255,255,255,0.4)",
   },
   analyticsRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 6,
+    marginBottom: 8,
+    borderBottomWidth: 0.3,
+    borderBottomColor: "rgba(255,255,255,0.1)",
+    paddingBottom: 6,
   },
-  analyticsLabel: { color: "rgba(255,255,255,0.7)", fontSize: 12 },
-  analyticsValue: { color: "#FFFFFF", fontSize: 12 },
+  analyticsLabel: { color: "rgba(255,255,255,0.8)", fontSize: 13 },
+  analyticsValue: { color: "#FFFFFF", fontSize: 13 },
   calendarWrapper: {
     alignItems: "center",
-  },
-  monthPage: {
     width: width,
     paddingHorizontal: 20,
+    flex: 1,
   },
-  monthCard: {
-    backgroundColor: "rgba(19,33,75,0.65)",
-    borderRadius: 18,
+  calendarCard: {
+    width: "100%",
+    backgroundColor: "rgba(23,44,92,0.5)",
+    borderRadius: 20,
     padding: 14,
-    marginBottom: 16,
+    borderWidth: 0.3,
+    borderColor: "rgba(255,255,255,0.4)",
   },
   monthHeader: {
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  weekdayRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 14,
-    paddingHorizontal: 10,
+    marginBottom: 12,
   },
-  monthTitle: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "bold",
+  weekday: {
+    color: "rgba(255,255,255,0.7)",
+    fontSize: 11,
+    width: (width - 70) / 7,
+    textAlign: "center",
+  },
+  flatListContainer: {
+    height: 240, 
+  },
+  monthGrid: {
+    height: 240,
+    justifyContent: "flex-start",
   },
   weekRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 6,
+    marginBottom: 8,
   },
-  weekday: {
-    color: "rgba(255,255,255,0.5)",
-    fontSize: 10,
-    width: (width - 80) / 7,
-    textAlign: "center",
-  },
-  dayCell: {
-    width: (width - 80) / 7,
-    height: 32,
-    borderRadius: 16,
+  dayChip: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     justifyContent: "center",
     alignItems: "center",
-  },
-  predictedDay: {
-    backgroundColor: "rgba(209, 27, 27, 0.25)",
-    borderWidth: 1,
-    borderColor: "rgba(209, 27, 27, 0.45)",
-  },
-  dayText: { color: "#FFFFFF", fontSize: 14 },
-  outOfMonthText: { color: "rgba(255,255,255,0.3)" },
-  predictedDayText: { color: "#FFD6D6" },
-  periodDay: { backgroundColor: "#9a0d14" }, 
-  periodDayText: { color: "#FFFFFF", fontWeight: "bold" },
-  sectionTitle: {
-    color: "#FFFFFF",
-    fontSize: 14,
-    marginBottom: 12,
-    paddingHorizontal: 20,
-  },
-  saveButton: {
-    marginTop: 10,
-    marginBottom: 30,
     backgroundColor: "transparent",
+  },
+  dayChipPeriod: {
+    backgroundColor: "#ff4b4b",
+    borderWidth: 0,
+  },
+  dayChipPredicted: {
+    backgroundColor: "#ff7070",
+    borderWidth: 0,
+  },
+  dayText: { color: "#FFFFFF", fontSize: 13, fontWeight: "700" },
+  outOfMonthText: { color: "rgba(255,255,255,0.2)" },
+  dayTextPeriod: { color: "#FFFFFF", fontWeight: "bold" },
+  dayTextPredicted: { color: "rgba(255,255,255,0.7)" },
+  saveButton: {
+    marginTop: 20,
+    backgroundColor: "rgba(23,44,92,0.6)",
     borderWidth: 0.3,
     borderColor: "#FFFFFF",
     borderRadius: 18,
-    paddingHorizontal: 24,
-    paddingVertical: 10,
-},
+    paddingHorizontal: 28,
+    paddingVertical: 12,
+  },
   saveButtonText: {
     color: "#FFFFFF",
-    fontSize: 12,
-    fontWeight: "350",
-    letterSpacing: 0.6,
+    fontSize: 13,
+    letterSpacing: 0.5,
+  },
+  patternWrapper: {
+    paddingHorizontal: 20,
+    width: "100%",
+    flex: 1,
   },
   cycleRow: {
+    backgroundColor: "rgba(23,44,92,0.5)",
+    borderRadius: 16,
+    padding: 16,
     marginBottom: 12,
-    paddingHorizontal: 20,
+    borderWidth: 0.3,
+    borderColor: "rgba(255,255,255,0.4)",
   },
-  cycleLabel: { color: "#FFFFFF", fontSize: 12, marginBottom: 6 },
+  cycleLabel: { color: "rgba(255,255,255,0.9)", fontSize: 13, marginBottom: 8 },
+  cycleLabelRight: { position: "absolute", top: 16, right: 16 },
+  cycleValue: { color: "#FFFFFF", fontSize: 13 },
   cycleBar: {
     flexDirection: "row",
-    height: 14,
-    borderRadius: 999,
+    height: 6,
+    borderRadius: 3,
     overflow: "hidden",
-    backgroundColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderWidth: 0.3,
+    borderColor: "rgba(255,255,255,0.1)",
   },
-  cycleRed: { flex: 3, backgroundColor: "#C21616" },
-  cycleBlue: { flex: 2, backgroundColor: "#4EA6FF" },
+  cycleGlowTrack: {
+    shadowColor: "#FFFFFF",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.6,
+    shadowRadius: 3,
+  },
   emptyStateText: {
     color: "rgba(255,255,255,0.6)",
     fontSize: 12,
     textAlign: "center",
-    marginTop: 12,
+    marginTop: 20,
+    fontStyle: "italic",
   },
 });

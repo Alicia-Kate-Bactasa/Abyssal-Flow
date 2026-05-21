@@ -18,7 +18,7 @@ import {
     View,
 } from "react-native";
 
-const { height } = Dimensions.get("window");
+const { width, height } = Dimensions.get("window");
 const TOTAL_STEPS = 14;
 
 // ─── Cycle length bounds (Step 9) ────────────────────────────────────────────
@@ -113,6 +113,25 @@ const CYCLE_REGULARITY = [
   { id: "regular", label: "Regular", description: "Happens around the same time" },
   { id: "irregular", label: "Irregular", description: "Difficult to predict" },
 ];
+
+const TinySpeck = ({ top, left, opacity }: { top: number; left: number; opacity: number }) => {
+  return <View style={[s.speck, { top, left, opacity }]} />;
+};
+
+const BackgroundSparkles = () => {
+  const specks = useMemo(
+    () => Array.from({ length: 60 }, (_, idx) => ({ id: idx, top: Math.random() * height, left: Math.random() * width, opacity: 0.25 + Math.random() * 0.45 })),
+    [],
+  );
+
+  return (
+    <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
+      {specks.map((s) => (
+        <TinySpeck key={s.id} top={s.top} left={s.left} opacity={s.opacity} />
+      ))}
+    </View>
+  );
+};
 
 // ─── Reusable animated hook ───────────────────────────────────────────────────
 function useStepAnimation() {
@@ -316,20 +335,57 @@ export default function LandingScreen() {
     setBirthdayPickerOpen(false);
   };
 
+  const parseUserBirthday = (str: string) => {
+    if (!str) return null;
+    // Accept MM/DD/YY or MM/DD/YYYY or ISO YYYY-MM-DD
+    const mmddyy = /^\s*(\d{1,2})\/(\d{1,2})\/(\d{2,4})\s*$/;
+    const iso = /^\s*(\d{4})-(\d{1,2})-(\d{1,2})\s*$/;
+    let m;
+    if ((m = str.match(mmddyy))) {
+      const month = parseInt(m[1], 10) - 1;
+      const day = parseInt(m[2], 10);
+      let year = parseInt(m[3], 10);
+      if (year < 100) {
+        // two-digit year -> assume 19xx/20xx nearest to current year
+        const thisYear = new Date().getFullYear() % 100;
+        const century = year <= thisYear ? 2000 : 1900;
+        year = century + year;
+      }
+      return new Date(year, month, day);
+    }
+    if ((m = str.match(iso))) {
+      const year = parseInt(m[1], 10);
+      const month = parseInt(m[2], 10) - 1;
+      const day = parseInt(m[3], 10);
+      return new Date(year, month, day);
+    }
+    const parsed = new Date(str);
+    return isNaN(parsed.getTime()) ? null : parsed;
+  };
+
   const renderBirthdayGrid = () => {
     const weeks = buildMonthWeeks(birthdayViewYear, birthdayViewMonth);
+    const selectedDate = parseUserBirthday(birthday);
     return weeks.map((week, weekIndex) => (
       <View key={weekIndex} style={s.dayGridRow}>
         {week.map((day, cellIndex) => {
           if (!day) {
-            return <View key={`birthday-empty-${cellIndex}`} style={s.dayCell} />;
+            return <View key={`birthday-empty-${cellIndex}`} style={s.daySlot} />;
           }
-          const isSelected = birthday === formatShortDate(new Date(birthdayViewYear, birthdayViewMonth, day));
+          let isSelected = false;
+          if (selectedDate) {
+            isSelected =
+              selectedDate.getFullYear() === birthdayViewYear &&
+              selectedDate.getMonth() === birthdayViewMonth &&
+              selectedDate.getDate() === day;
+          } else {
+            isSelected = birthday === formatShortDate(new Date(birthdayViewYear, birthdayViewMonth, day));
+          }
           return (
             <TouchableOpacity
               activeOpacity={1}
               key={`${birthdayViewYear}-${birthdayViewMonth}-${day}`}
-              style={[s.dayCell, isSelected && s.dayCellSelected]}
+              style={[s.daySlot, s.dayCell, isSelected && s.dayCellSelected]}
               onPress={() => selectBirthday(day)}
             >
               <Text style={[s.dayNumber, isSelected && s.dayNumberSelected]}>{day}</Text>
@@ -479,9 +535,9 @@ export default function LandingScreen() {
                 </View>
                 <View style={s.dayHeaders}>
                   {DAYS.map((day) => (
-                    <Text key={day} style={s.dayHeader}>
-                      {day}
-                    </Text>
+                    <View key={day} style={s.dayHeaderSlot}>
+                      <Text style={s.dayHeader}>{day}</Text>
+                    </View>
                   ))}
                 </View>
                 <View style={s.dayGrid}>{renderBirthdayGrid()}</View>
@@ -759,6 +815,7 @@ export default function LandingScreen() {
     >
       <StatusBar barStyle="light-content" />
       <WaveBackground />
+      <BackgroundSparkles />
 
       {/* Progress bar */}
       <View style={s.progressContainer}>
@@ -875,6 +932,19 @@ const s = StyleSheet.create({
     color: "#E1F2FF",
   },
 
+  speck: {
+    position: "absolute",
+    width: 1,
+    height: 1,
+    borderRadius: 0.5,
+    backgroundColor: "rgba(255,255,255,0.92)",
+    shadowColor: "rgba(255,255,255,0.9)",
+    shadowOffset: { width: 0, height: 0 },
+    shadowRadius: 10,
+    shadowOpacity: 1,
+    elevation: 1,
+  },
+
   // Text input
   inputWrapper: {
     backgroundColor: "transparent",
@@ -980,22 +1050,25 @@ const s = StyleSheet.create({
     color: "#FFFFFF",
     letterSpacing: 0.5,
   },
-  dayHeaders: { flexDirection: "row", justifyContent: "space-between", marginBottom: 10 },
+  dayHeaders: { flexDirection: "row", justifyContent: "space-between", marginBottom: 8 },
+  dayHeaderSlot: { width: 22, alignItems: "center" },
   dayHeader: {
-    width: 30,
+    width: 22,
     textAlign: "center",
     fontFamily: Platform.OS === "ios" ? "Georgia" : "serif",
-    fontSize: 8,
+    fontSize: 7,
     fontWeight: "600",
     letterSpacing: 1.5,
     color: "#B5BEC6",
   },
-  dayGrid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", rowGap: 8 },
-  dayCell: { width: 30, height: 30, borderRadius: 15, justifyContent: "center", alignItems: "center", borderWidth: 0.7, borderColor: "transparent" },
+  dayGrid: { rowGap: 6 },
+  dayGridRow: { flexDirection: "row", alignItems: "center", marginBottom: 4 },
+  daySlot: { width: 22, alignItems: "center", justifyContent: "center" },
+  dayCell: { width: 22, height: 22, borderRadius: 11, justifyContent: "center", alignItems: "center", borderWidth: 0.7, borderColor: "transparent" },
   dayCellSelected: { backgroundColor: "#ff4343" },
   dayNumber: {
     fontFamily: Platform.OS === "ios" ? "Georgia" : "serif",
-    fontSize: 10,
+    fontSize: 8,
     fontWeight: "600",
     color: "#FFFFFF",
     textAlign: "center",
@@ -1013,7 +1086,7 @@ const s = StyleSheet.create({
     borderRadius: 20,
     paddingHorizontal: 18,
     height: 52,
-    borderWidth: 0.7,
+    borderWidth: 0.3,
     borderColor: "rgba(181,230,255,0.42)",
   },
   birthdayFieldText: {
@@ -1026,19 +1099,19 @@ const s = StyleSheet.create({
     color: "rgba(255, 252, 252, 0.66)",
   },
   birthdayCalendarCard: {
-    marginTop: 12,
-    borderRadius: 22,
-    padding: 16,
-    borderWidth: 0.7,
-    borderColor: "rgba(181,230,255,0.34)",
-    backgroundColor: "rgba(9, 28, 58, 0.58)",
+    marginTop: 10,
+    borderRadius: 20,
+    padding: 10,
+    borderWidth: 0.3,
+    borderColor: "rgba(181,230,255,0.22)",
+    backgroundColor: "rgba(9, 28, 58, 0.82)",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.22,
+    shadowRadius: 18,
+    elevation: 8,
+    overflow: "hidden",
   },
-  dayGridRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 8,
-  },
-
   cycleLengthShell: {
     width: "100%",
     alignItems: "center",
@@ -1051,9 +1124,9 @@ const s = StyleSheet.create({
     paddingVertical: 18,
     paddingHorizontal: 16,
     borderRadius: 28,
-    borderWidth: 0.7,
+    borderWidth: 0.2,
     borderColor: "rgba(181,230,255,0.42)",
-    backgroundColor: "rgba(9, 28, 58, 0.42)",
+    backgroundColor: "rgba(0, 58, 120, 0.42)",
   },
   cycleLengthButton: {
     width: 42,

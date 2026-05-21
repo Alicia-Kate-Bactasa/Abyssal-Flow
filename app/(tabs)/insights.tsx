@@ -1,8 +1,9 @@
 import { formatDateKey, parseDateKey, useCycleData } from "@/hooks/use-cycle-store";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
+  Animated,
   Dimensions,
   Pressable,
   ScrollView,
@@ -13,7 +14,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-const { width } = Dimensions.get("window");
+const { width, height } = Dimensions.get("window");
 const WEEKDAYS = ["S", "M", "T", "W", "T", "F", "S"];
 
 const buildWeeks = (year: number, month: number) => {
@@ -50,11 +51,71 @@ const formatMonthLabel = (year: number, month: number) =>
   });
 
 const getContextMessage = (moods: string[], symptoms: string[]) => {
-  if (symptoms.includes("Bloating")) return "Hydrate well to help with bloating.";
-  if (symptoms.includes("Cramps")) return "Warm compresses can ease cramping.";
-  if (moods.includes("Energetic")) return "Your energy is high today.";
-  if (moods.includes("Anxious")) return "Gentle breathing can help ease anxiety.";
-  return "Keep tracking to unlock more insights.";
+  if (symptoms.includes("Bloating")) return "The tide surges. Drink more water to find your center.";
+  if (symptoms.includes("Cramps")) return "Currents are swift. Rest in the ocean's gentle embrace.";
+  if (moods.includes("Energetic")) return "You are a radiant pearl of energy today.";
+  if (moods.includes("Anxious")) return "The sea is deep. Breathe deeply to calm the inner waters.";
+  return "Chart your path across the cosmic ocean of cycle insights.";
+};
+
+const TinySpeck = ({ top, left, opacity }: { top: number, left: number, opacity: number }) => {
+  return <View style={[styles.speck, { top, left, opacity }]} />;
+};
+
+const BackgroundSparkles = () => {
+  const specks = useMemo(() => {
+    return Array.from({ length: 60 }, (_, idx) => ({
+      id: idx,
+      top: Math.random() * height,
+      left: Math.random() * width,
+      opacity: 0.25 + Math.random() * 0.45,
+    }));
+  }, []);
+
+  return (
+    <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
+      {specks.map((s) => (
+        <TinySpeck key={s.id} top={s.top} left={s.left} opacity={s.opacity} />
+      ))}
+    </View>
+  );
+};
+
+// Component for the pulsing text shadow on headings
+const PulsingHeading = ({ style, children }: { style: any, children: React.ReactNode }) => {
+  const glowAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(glowAnim, {
+          toValue: 6,
+          duration: 2000,
+          useNativeDriver: false,
+        }),
+        Animated.timing(glowAnim, {
+          toValue: 1,
+          duration: 2000,
+          useNativeDriver: false,
+        }),
+      ])
+    ).start();
+  }, [glowAnim]);
+
+  return (
+    <Animated.Text
+      style={[
+        style,
+        {
+          textShadowColor: "rgba(255, 255, 255, 0.7)",
+          textShadowOffset: { width: 0, height: 0 },
+          textShadowRadius: glowAnim,
+        },
+      ]}
+    >
+      {children}
+    </Animated.Text>
+  );
 };
 
 export default function InsightsScreen() {
@@ -88,16 +149,22 @@ export default function InsightsScreen() {
     return keys.length ? parseDateKey(keys[0]) : null;
   }, [predictedDates]);
 
+  // Phase Estimator
+  const currentPhase = useMemo(() => {
+    if (!nextPredictedDate) return "Unknown Depth";
+    const daysUntil = Math.floor((nextPredictedDate.getTime() - new Date().getTime()) / (1000 * 3600 * 24));
+    if (daysUntil <= 5) return "Ebbing Tide (Luteal)";
+    if (daysUntil <= 14) return "Crest (Ovulation)";
+    if (daysUntil <= 20) return "Rising Tide (Follicular)";
+    return "Abyssal Flow (Menstruation)";
+  }, [nextPredictedDate]);
+
   const phasePredictionText = nextPredictedDate
-    ? `Next predicted period starts ${nextPredictedDate.toLocaleDateString("default", {
+    ? `Currents shift around ${nextPredictedDate.toLocaleDateString("default", {
         month: "short",
         day: "numeric",
       })}.`
-    : "Log more dates to unlock predictions.";
-
-  const moodPatternText = moods.length
-    ? `Recent mood focus: ${moods.slice(0, 2).join(" & ")}.`
-    : "Log a mood to see patterns across your cycle.";
+    : "The cosmic path is unknown.";
 
   const handlePrevMonth = () => {
     setCurrentViewDate((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
@@ -117,13 +184,13 @@ export default function InsightsScreen() {
       <View style={styles.calendarCard}>
         <View style={styles.monthHeader}>
           <TouchableOpacity onPress={handlePrevMonth} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-            <Ionicons name="chevron-back" size={20} color="#4EA6FF" />
+            <Ionicons name="chevron-back" size={18} color="#FFFFFF" />
           </TouchableOpacity>
           
-          <Text style={styles.monthLabel}>{monthLabel}</Text>
+          <PulsingHeading style={styles.monthLabelGlow}>{monthLabel}</PulsingHeading>
           
           <TouchableOpacity onPress={handleNextMonth} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-            <Ionicons name="chevron-forward" size={20} color="#4EA6FF" />
+            <Ionicons name="chevron-forward" size={18} color="#FFFFFF" />
           </TouchableOpacity>
         </View>
 
@@ -179,71 +246,64 @@ export default function InsightsScreen() {
 
   return (
     <LinearGradient colors={["#061736", "#1E3A78"]} style={styles.container}>
+      <BackgroundSparkles />
       <ScrollView
         contentContainerStyle={[
           styles.content,
           { paddingTop: 20 + insets.top, paddingBottom: 140 + insets.bottom },
         ]}
       >
-        <Text style={styles.title}>Tidal Summary</Text>
+        <PulsingHeading style={styles.titleGlow}>Oceanic Summary</PulsingHeading>
 
         <View style={styles.summaryCard}>
+          <PulsingHeading style={styles.subTitleGlow}>Celestial Currents</PulsingHeading>
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Average cycle length</Text>
-            <Text style={styles.summaryValue}>{cycleStats.avgCycleLength} days</Text>
+            <Text style={styles.summaryLabel}>Current Tide Phase</Text>
+            <Text style={styles.summaryValue}>{currentPhase}</Text>
           </View>
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Average period length</Text>
-            <Text style={styles.summaryValue}>{cycleStats.avgPeriodLength} days</Text>
+            <Text style={styles.summaryLabel}>Oceanic Cycle Length</Text>
+            <Text style={styles.summaryValue}>{cycleStats.avgCycleLength} tides</Text>
           </View>
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Phase prediction</Text>
+            <Text style={styles.summaryLabel}>Tide Flow Duration</Text>
+            <Text style={styles.summaryValue}>{cycleStats.avgPeriodLength} tides</Text>
+          </View>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Forecast</Text>
             <Text style={styles.summaryValue}>{phasePredictionText}</Text>
           </View>
         </View>
-
-        <Text style={styles.subTitle}>Cycle Calendar</Text>
         
         {renderCalendar()}
 
-        <Text style={styles.sectionHeader}>Logged Moods</Text>
-        <View style={styles.iconRow}>
-          {moods.length ? (
-            moods.map((mood) => (
-              <View key={mood} style={styles.iconChip}>
-                <Text style={styles.iconText}>{mood.slice(0, 2).toUpperCase()}</Text>
-              </View>
-            ))
+        {/* Dynamic Daily Summary based on Calendar Selection */}
+        <View style={styles.summaryCard}>
+          <PulsingHeading style={styles.subTitleGlow}>
+            Daily Dive: {selectedDate.toLocaleDateString("default", { month: "short", day: "numeric" })}
+          </PulsingHeading>
+          {moods.length > 0 || symptoms.length > 0 ? (
+            <>
+              {moods.length > 0 && (
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>Auras (Moods)</Text>
+                  <Text style={styles.summaryValue}>{moods.join(", ")}</Text>
+                </View>
+              )}
+              {symptoms.length > 0 && (
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>Echoes (Symptoms)</Text>
+                  <Text style={styles.summaryValue}>{symptoms.join(", ")}</Text>
+                </View>
+              )}
+            </>
           ) : (
-            <Text style={styles.emptyStateText}>No moods logged.</Text>
+            <Text style={styles.emptyStateText}>Waters were undisturbed on this day.</Text>
           )}
         </View>
 
-        <Text style={styles.sectionHeader}>Logged Symptoms</Text>
-        <View style={styles.iconRow}>
-          {symptoms.length ? (
-            symptoms.map((symptom) => (
-              <View key={symptom} style={styles.iconChip}>
-                <Text style={styles.iconText}>
-                  {symptom
-                    .split(" ")
-                    .map((word) => word[0])
-                    .join("")
-                    .toUpperCase()}
-                </Text>
-              </View>
-            ))
-          ) : (
-            <Text style={styles.emptyStateText}>No symptoms logged.</Text>
-          )}
-        </View>
-
-        <View style={styles.insightCardWide}>
-          <Text style={styles.insightText}>{contextMessage}</Text>
-        </View>
-
-        <Text style={styles.sectionHeader}>Symptom Frequency</Text>
         <View style={styles.frequencyCard}>
+          <PulsingHeading style={styles.sectionHeaderGlow}>Echo Frequency (This Month)</PulsingHeading>
           {currentMonthFrequency.length ? (
             currentMonthFrequency.map((entry) => (
               <View key={entry.label} style={styles.frequencyRow}>
@@ -259,14 +319,14 @@ export default function InsightsScreen() {
               </View>
             ))
           ) : (
-            <Text style={styles.emptyStateText}>No symptoms logged this month.</Text>
+            <Text style={styles.emptyStateText}>No echoes logged this month.</Text>
           )}
         </View>
 
-        <Text style={styles.sectionHeader}>Mood Patterns</Text>
         <View style={styles.insightCardWide}>
-          <Text style={styles.insightText}>{moodPatternText}</Text>
+          <Text style={styles.insightText}>{contextMessage}</Text>
         </View>
+
       </ScrollView>
     </LinearGradient>
   );
@@ -277,136 +337,158 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: 20,
   },
-  title: {
-    color: "#FFFFFF",
-    textAlign: "center",
-    fontSize: 16,
-    marginBottom: 12,
+  // Speck styling
+  speck: {
+    position: 'absolute',
+    width: 1.5,
+    height: 1.5,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 1,
+    shadowColor: '#FFFFFF',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 1,
+    shadowRadius: 3,
   },
+  // Heading text styles (smaller, Georgia)
+  titleGlow: {
+    fontFamily: "Georgia",
+    fontSize: 16,
+    letterSpacing: 0.5,
+    marginBottom: 20,
+    textAlign: "center",
+    color: "#FFFFFF",
+  },
+  subTitleGlow: {
+    fontFamily: "Georgia",
+    fontSize: 14,
+    marginBottom: 14,
+    color: "#FFFFFF",
+  },
+  sectionHeaderGlow: {
+    fontFamily: "Georgia",
+    fontSize: 13,
+    marginBottom: 12,
+    color: "#FFFFFF",
+  },
+  monthLabelGlow: {
+    fontFamily: "Georgia",
+    fontSize: 15,
+    textAlign: "center",
+    color: "#FFFFFF",
+  },
+  // Layout and Card styles
   summaryCard: {
-    backgroundColor: "rgba(23,44,92,0.8)",
-    borderRadius: 18,
-    padding: 14,
-    marginBottom: 16,
+    backgroundColor: "rgba(23,44,92,0.5)",
+    borderRadius: 22,
+    padding: 18,
+    marginBottom: 22,
+    borderWidth: 0.3,
+    borderColor: "rgba(255,255,255,0.4)",
   },
   summaryRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 6,
+    marginBottom: 10,
+    borderBottomWidth: 0.3,
+    borderBottomColor: "rgba(255,255,255,0.2)",
+    paddingBottom: 4,
   },
-  summaryLabel: { color: "rgba(255,255,255,0.7)", fontSize: 12 },
-  summaryValue: { color: "#FFFFFF", fontSize: 12 },
-  subTitle: {
-    color: "#FFFFFF",
-    fontSize: 14,
-    marginBottom: 8,
-  },
+  summaryLabel: { color: "rgba(255,255,255,0.8)", fontSize: 13, fontWeight: "normal" },
+  summaryValue: { color: "#FFFFFF", fontSize: 13, fontWeight: "normal", maxWidth: "50%", textAlign: "right" },
   calendarCard: {
-    backgroundColor: "rgba(23,44,92,0.7)",
-    borderRadius: 16,
-    padding: 12,
-    marginBottom: 16,
+    backgroundColor: "rgba(23,44,92,0.5)",
+    borderRadius: 20,
+    padding: 14,
+    marginBottom: 20,
+    borderWidth: 0.3,
+    borderColor: "rgba(255,255,255,0.4)",
   },
   monthHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 14,
-    paddingHorizontal: 10,
-  },
-  monthLabel: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "bold",
-    textAlign: "center",
+    marginBottom: 16,
+    paddingHorizontal: 12,
   },
   weekRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 6,
+    marginBottom: 8,
   },
   weekdayLabel: {
-    color: "rgba(255,255,255,0.6)",
-    fontSize: 10,
+    color: "rgba(255,255,255,0.7)",
+    fontSize: 11,
+    fontWeight: "normal",
     width: (width - 90) / 7,
     textAlign: "center",
   },
   dayChip: {
-    width: (width - 90) / 7,
+    width: 28,
     height: 28,
     borderRadius: 14,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 6,
+    marginBottom: 8,
+    backgroundColor: "transparent",
   },
   dayChipSelected: {
-    borderWidth: 1,
-    borderColor: "#A8D8EA",
+    borderWidth: 0,
+    backgroundColor: "#ff4b4b",
   },
-  dayChipPeriod: { backgroundColor: "#D11B1B" },
+  dayChipPeriod: {
+    borderWidth: 0,
+    backgroundColor: "#ff5e5e",
+  },
   dayChipPredicted: {
-    backgroundColor: "rgba(209, 27, 27, 0.25)",
-    borderWidth: 1,
-    borderColor: "rgba(209, 27, 27, 0.5)",
+    borderWidth: 0,
+    backgroundColor: "#ff7777",
   },
-  dayText: { color: "#FFFFFF", fontSize: 12 },
+  dayText: { color: "#FFFFFF", fontSize: 13, fontWeight: "700" },
   outOfMonthText: { color: "rgba(255,255,255,0.3)" },
   dayTextPeriod: { color: "#FFFFFF", fontWeight: "bold" },
-  dayTextPredicted: { color: "#FFD6D6" },
-  sectionHeader: {
-    color: "#FFFFFF",
-    fontSize: 13,
-    marginBottom: 10,
-  },
-  iconRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-    marginBottom: 18,
-  },
-  iconChip: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: "#4AA3FF",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  iconText: { color: "#FFFFFF", fontSize: 16 },
+  dayTextPredicted: { color: "rgba(255,255,255,0.7)" },
   insightCardWide: {
-    backgroundColor: "rgba(23,44,92,0.8)",
-    borderRadius: 18,
-    padding: 14,
-    marginBottom: 12,
+    backgroundColor: "rgba(23,44,92,0.5)",
+    borderRadius: 20,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 0.3,
+    borderColor: "rgba(255,255,255,0.4)",
   },
-  insightText: { color: "#FFFFFF", fontSize: 11 },
+  insightText: { color: "#FFFFFF", fontSize: 13, lineHeight: 18 },
   frequencyCard: {
-    backgroundColor: "rgba(23,44,92,0.8)",
-    borderRadius: 18,
-    padding: 12,
-    marginBottom: 18,
+    backgroundColor: "rgba(23,44,92,0.5)",
+    borderRadius: 22,
+    padding: 14,
+    marginBottom: 20,
+    borderWidth: 0.3,
+    borderColor: "rgba(255,255,255,0.4)",
   },
   frequencyRow: {
-    marginBottom: 10,
+    marginBottom: 12,
   },
   frequencyLabel: {
     color: "#FFFFFF",
-    fontSize: 11,
-    marginBottom: 6,
+    fontSize: 12,
+    marginBottom: 7,
+    fontWeight: "normal",
   },
   frequencyBarTrack: {
     height: 6,
-    borderRadius: 999,
-    backgroundColor: "rgba(255,255,255,0.12)",
+    borderRadius: 3,
+    backgroundColor: "rgba(255,255,255,0.1)",
     overflow: "hidden",
   },
   frequencyBarFill: {
     height: 6,
-    borderRadius: 999,
-    backgroundColor: "#4EA6FF",
+    borderRadius: 3,
+    backgroundColor: "#FFFFFF",
   },
   emptyStateText: {
     color: "rgba(255,255,255,0.6)",
-    fontSize: 12,
+    fontSize: 13,
+    fontStyle: "italic",
+    textAlign: "center",
+    marginTop: 6,
   },
 });
