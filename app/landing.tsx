@@ -4,6 +4,7 @@ import { useUser } from "@/hooks/use-user-store";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
+import { submitOnboarding } from "@/hooks/use-onboarding-submit";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
@@ -30,8 +31,18 @@ const VISIBLE_ITEMS = 7;
 // ─── Calendar constants (Step 8) ─────────────────────────────────────────────
 const DAYS = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
 const MONTHS = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
 ];
 function getDaysInMonth(year: number, month: number) {
   return new Date(year, month + 1, 0).getDate();
@@ -92,17 +103,35 @@ const FOODS = [
   { id: "spicy", label: "Spicy (Hot foods)" },
 ];
 const CYCLE_REGULARITY = [
-  { id: "regular", label: "Regular", description: "Happens around the same time" },
+  {
+    id: "regular",
+    label: "Regular",
+    description: "Happens around the same time",
+  },
   { id: "irregular", label: "Irregular", description: "Difficult to predict" },
 ];
 
-const TinySpeck = ({ top, left, opacity }: { top: number; left: number; opacity: number }) => {
+const TinySpeck = ({
+  top,
+  left,
+  opacity,
+}: {
+  top: number;
+  left: number;
+  opacity: number;
+}) => {
   return <View style={[s.speck, { top, left, opacity }]} />;
 };
 
 const BackgroundSparkles = () => {
   const specks = useMemo(
-    () => Array.from({ length: 60 }, (_, idx) => ({ id: idx, top: Math.random() * height, left: Math.random() * width, opacity: 0.25 + Math.random() * 0.45 })),
+    () =>
+      Array.from({ length: 60 }, (_, idx) => ({
+        id: idx,
+        top: Math.random() * height,
+        left: Math.random() * width,
+        opacity: 0.25 + Math.random() * 0.45,
+      })),
     [],
   );
 
@@ -122,18 +151,41 @@ function useStepAnimation() {
   const bodyOpacity = useRef(new Animated.Value(1)).current;
   const buttonOpacity = useRef(new Animated.Value(1)).current;
 
-  const run = useCallback((extraAnims: Animated.CompositeAnimation[] = []) => {
-    Animated.stagger(150, [
-      Animated.timing(titleOpacity, { toValue: 0, duration: 1, useNativeDriver: true }),
-      Animated.parallel([
-        Animated.timing(titleOpacity, { toValue: 1, duration: 700, useNativeDriver: true }),
-        Animated.timing(subtitleOpacity, { toValue: 1, duration: 700, useNativeDriver: true }),
-        Animated.timing(bodyOpacity, { toValue: 1, duration: 700, useNativeDriver: true }),
-        Animated.timing(buttonOpacity, { toValue: 1, duration: 700, useNativeDriver: true }),
-      ]),
-      ...extraAnims,
-    ]).start();
-  }, [bodyOpacity, buttonOpacity, subtitleOpacity, titleOpacity]);
+  const run = useCallback(
+    (extraAnims: Animated.CompositeAnimation[] = []) => {
+      Animated.stagger(150, [
+        Animated.timing(titleOpacity, {
+          toValue: 0,
+          duration: 1,
+          useNativeDriver: true,
+        }),
+        Animated.parallel([
+          Animated.timing(titleOpacity, {
+            toValue: 1,
+            duration: 700,
+            useNativeDriver: true,
+          }),
+          Animated.timing(subtitleOpacity, {
+            toValue: 1,
+            duration: 700,
+            useNativeDriver: true,
+          }),
+          Animated.timing(bodyOpacity, {
+            toValue: 1,
+            duration: 700,
+            useNativeDriver: true,
+          }),
+          Animated.timing(buttonOpacity, {
+            toValue: 1,
+            duration: 700,
+            useNativeDriver: true,
+          }),
+        ]),
+        ...extraAnims,
+      ]).start();
+    },
+    [bodyOpacity, buttonOpacity, subtitleOpacity, titleOpacity],
+  );
 
   return useMemo(
     () => ({ titleOpacity, subtitleOpacity, bodyOpacity, buttonOpacity, run }),
@@ -171,7 +223,9 @@ function RadioList({
             <View style={[s.radioDot, sel && s.radioDotSelected]}>
               {sel && <View style={s.radioDotInner} />}
             </View>
-            <Text style={[s.optionLabel, sel && s.optionLabelSelected]}>{opt.label}</Text>
+            <Text style={[s.optionLabel, sel && s.optionLabelSelected]}>
+              {opt.label}
+            </Text>
           </TouchableOpacity>
         );
       })}
@@ -189,8 +243,17 @@ function WaterIcon() {
     const animateWave = (anim: Animated.Value, delay: number) =>
       Animated.loop(
         Animated.sequence([
-          Animated.timing(anim, { toValue: 6, duration: 800, delay, useNativeDriver: true }),
-          Animated.timing(anim, { toValue: 0, duration: 800, useNativeDriver: true }),
+          Animated.timing(anim, {
+            toValue: 6,
+            duration: 800,
+            delay,
+            useNativeDriver: true,
+          }),
+          Animated.timing(anim, {
+            toValue: 0,
+            duration: 800,
+            useNativeDriver: true,
+          }),
         ]),
       );
     animateWave(wave1, 0).start();
@@ -201,7 +264,10 @@ function WaterIcon() {
   return (
     <View style={s.waterIconContainer}>
       {[wave1, wave2, wave3].map((anim, i) => (
-        <Animated.View key={i} style={[s.waveLine, { transform: [{ translateY: anim }] }]}>
+        <Animated.View
+          key={i}
+          style={[s.waveLine, { transform: [{ translateY: anim }] }]}
+        >
           <View style={s.waveShape} />
         </Animated.View>
       ))}
@@ -242,15 +308,25 @@ function ProgressBar({ step }: { step: number }) {
 export default function LandingScreen() {
   const router = useRouter();
   const [step, setStep] = useState(1);
-  const { periodDates, togglePeriodDate, profile, setCycleLength, updateProfile } = useCycleData();
+  const {
+    periodDates,
+    togglePeriodDate,
+    profile,
+    setCycleLength,
+    updateProfile,
+  } = useCycleData();
   const { setNickname: saveNickname } = useUser();
 
   // Collected data
   const [nickname, setNickname] = useState("");
   const [birthday, setBirthday] = useState("");
   const [birthdayPickerOpen, setBirthdayPickerOpen] = useState(false);
-  const [birthdayViewYear, setBirthdayViewYear] = useState(() => new Date().getFullYear() - 20);
-  const [birthdayViewMonth, setBirthdayViewMonth] = useState(() => new Date().getMonth());
+  const [birthdayViewYear, setBirthdayViewYear] = useState(
+    () => new Date().getFullYear() - 20,
+  );
+  const [birthdayViewMonth, setBirthdayViewMonth] = useState(() =>
+    new Date().getMonth(),
+  );
   const [cycleRegularity, setCycleRegularity] = useState<string | null>(null);
   const [healthHistory, setHealthHistory] = useState<string[]>([]);
   const [medicalCheckups, setMedicalCheckups] = useState<string | null>(null);
@@ -259,6 +335,7 @@ export default function LandingScreen() {
   const [symptoms, setSymptoms] = useState<string[]>([]);
   const [moods, setMoods] = useState<string[]>([]);
   const [comfortFood, setComfortFood] = useState<string[]>([]);
+  const [submitting, setSubmitting] = useState(false);
 
   // Calendar state (Step 8)
   const now = new Date();
@@ -322,7 +399,9 @@ export default function LandingScreen() {
       setList([exclusiveId]);
       return;
     }
-    const withoutExclusive = exclusiveId ? list.filter((i) => i !== exclusiveId) : list;
+    const withoutExclusive = exclusiveId
+      ? list.filter((i) => i !== exclusiveId)
+      : list;
     if (withoutExclusive.includes(id)) {
       setList(withoutExclusive.filter((i) => i !== id));
     } else {
@@ -347,45 +426,200 @@ export default function LandingScreen() {
 
   // birthday dropdown removed — calendar rendering helpers no longer needed
 
-  
-
   // ── canProceed per step ─────────────────────────────────────────────────────
   const canProceed = (): boolean => {
     switch (step) {
-      case 1: return !!nickname.trim();
-      case 2: return !!birthday.trim();
-      case 3: return true;
-      case 4: return !!cycleRegularity;
-      case 5: return healthHistory.length > 0;
-      case 6: return !!medicalCheckups;
-      case 7: return medications.length > 0;
-      case 8: return true; // calendar optional
-      case 9: return true;
-      case 10: return !!typicalFlow;
-      case 11: return symptoms.length > 0;
-      case 12: return moods.length > 0;
-      case 13: return comfortFood.length > 0;
-      case 14: return true;
-      default: return false;
+      case 1:
+        return !!nickname.trim();
+      case 2:
+        return !!birthday.trim();
+      case 3:
+        return true;
+      case 4:
+        return !!cycleRegularity;
+      case 5:
+        return healthHistory.length > 0;
+      case 6:
+        return !!medicalCheckups;
+      case 7:
+        return medications.length > 0;
+      case 8:
+        return true; // calendar optional
+      case 9:
+        return true;
+      case 10:
+        return !!typicalFlow;
+      case 11:
+        return symptoms.length > 0;
+      case 12:
+        return moods.length > 0;
+      case 13:
+        return comfortFood.length > 0;
+      case 14:
+        return true;
+      default:
+        return false;
     }
   };
 
+  // ── Mappings from frontend ids to lookup numeric IDs expected by onboarding hook
+  const HEALTH_MAP: Record<string, number> = {
+    pcos: 1,
+    endometriosis: 2,
+    fibroids: 3,
+    thyroid: 4,
+    none: 5,
+  };
+  const MEDS_MAP: Record<string, number> = {
+    birth_control: 1,
+    hormonal: 2,
+    painkillers: 3,
+    none: 4,
+  };
+  const SYMPTOM_MAP: Record<string, number> = {
+    cramps: 1,
+    bloating: 2,
+    breast: 3,
+    backpain: 4,
+    acne: 5,
+    headaches: 6,
+  };
+  const MOOD_MAP: Record<string, number> = {
+    anxiety: 1,
+    irritability: 2,
+    lowmood: 3,
+    fatigue: 4,
+    nochange: 5,
+  };
+  const FOOD_MAP: Record<string, number> = {
+    sweet: 1,
+    salty: 2,
+    savory: 3,
+    spicy: 4,
+  };
+
+  function parseShortBirthdayToIso(short: string) {
+    // short = MM/DD/YY
+    if (!short) return null;
+    const parts = short.split("/");
+    if (parts.length !== 3) return null;
+    const m = Number(parts[0]);
+    const d = Number(parts[1]);
+    const yy = Number(parts[2]);
+    const currentTwo = new Date().getFullYear() % 100;
+    const fullYear = yy <= currentTwo ? 2000 + yy : 1900 + yy;
+    const iso = new Date(fullYear, m - 1, d).toISOString().slice(0, 10);
+    return iso;
+  }
+
+  async function handleFinish() {
+    if (submitting) return;
+    setSubmitting(true);
+    try {
+      // assemble payload expected by submitOnboarding
+      const periodDatesArray = Object.keys(periodDates).filter(
+        (k) => !!periodDates[k],
+      );
+      const payload = {
+        nickname: nickname.trim(),
+        birthday: parseShortBirthdayToIso(birthday) || "",
+        periodDates: periodDatesArray,
+        cycleRegularity:
+          (cycleRegularity as "regular" | "irregular" | "unsure") || "unsure",
+        cycleLength: profile.cycleLength || 28,
+        typicalFlow:
+          (typicalFlow as "light" | "medium" | "heavy" | "very_heavy") ||
+          "medium",
+        medicalCheckups:
+          medicalCheckups === "yes"
+            ? "regular"
+            : medicalCheckups === "sometimes"
+              ? "occasional"
+              : medicalCheckups === "no"
+                ? "never"
+                : "unsure",
+        healthHistoryIds: healthHistory
+          .map((id) => HEALTH_MAP[id] || 0)
+          .filter(Boolean),
+        medicationIds: medications
+          .map((id) => MEDS_MAP[id] || 0)
+          .filter(Boolean),
+        symptomIds: symptoms.map((id) => SYMPTOM_MAP[id] || 0).filter(Boolean),
+        moodIds: moods.map((id) => MOOD_MAP[id] || 0).filter(Boolean),
+        comfortFoodIds: comfortFood
+          .map((id) => FOOD_MAP[id] || 0)
+          .filter(Boolean),
+      };
+
+      await submitOnboarding(payload as any);
+      router.replace("/dashboard");
+    } catch (err) {
+      console.error("Onboarding submit failed:", err);
+      // optionally show user-facing alert
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   // ── Step title & subtitle ───────────────────────────────────────────────────
   const stepMeta: Record<number, { title: string; subtitle?: string }> = {
-    1: { title: "Welcome to Abyssal Flow!", subtitle: "What should we call you?" },
-    2: { title: "Your Birthday", subtitle: "This helps us understand your cycle better." },
+    1: {
+      title: "Welcome to Abyssal Flow!",
+      subtitle: "What should we call you?",
+    },
+    2: {
+      title: "Your Birthday",
+      subtitle: "This helps us understand your cycle better.",
+    },
     3: { title: "Our Purpose", subtitle: undefined },
-    4: { title: "Cycle Regularity", subtitle: "Is your period usually regular?" },
-    5: { title: "Health History", subtitle: "Have you been diagnosed with any of the following?" },
-    6: { title: "Medical Checkups", subtitle: "Do you see a doctor or OB-GYN regularly for your period health?" },
-    7: { title: "Current Medications", subtitle: "Are you taking any of these?" },
-    8: { title: "Your Recent History", subtitle: "Tap the dates of your last period. The more logs you provide, the more accurate our prediction becomes." },
-    9: { title: "Cycle Length", subtitle: "On average, how many days are there from the start of one period to the start of the next?" },
-    10: { title: "Typical Flow", subtitle: "How would you describe your heaviest days?" },
-    11: { title: "Common Symptoms", subtitle: "What do you usually experience?" },
-    12: { title: "Emotional Currents", subtitle: "How does your cycle typically impact your mood?" },
-    13: { title: "Favorite Comfort Food", subtitle: "What is your go-to snack during your period?" },
-    14: { title: "Predicting Your Flow...", subtitle: "We are analyzing your history and symptoms to map out your next cycle." },
+    4: {
+      title: "Cycle Regularity",
+      subtitle: "Is your period usually regular?",
+    },
+    5: {
+      title: "Health History",
+      subtitle: "Have you been diagnosed with any of the following?",
+    },
+    6: {
+      title: "Medical Checkups",
+      subtitle:
+        "Do you see a doctor or OB-GYN regularly for your period health?",
+    },
+    7: {
+      title: "Current Medications",
+      subtitle: "Are you taking any of these?",
+    },
+    8: {
+      title: "Your Recent History",
+      subtitle:
+        "Tap the dates of your last period. The more logs you provide, the more accurate our prediction becomes.",
+    },
+    9: {
+      title: "Cycle Length",
+      subtitle:
+        "On average, how many days are there from the start of one period to the start of the next?",
+    },
+    10: {
+      title: "Typical Flow",
+      subtitle: "How would you describe your heaviest days?",
+    },
+    11: {
+      title: "Common Symptoms",
+      subtitle: "What do you usually experience?",
+    },
+    12: {
+      title: "Emotional Currents",
+      subtitle: "How does your cycle typically impact your mood?",
+    },
+    13: {
+      title: "Favorite Comfort Food",
+      subtitle: "What is your go-to snack during your period?",
+    },
+    14: {
+      title: "Predicting Your Flow...",
+      subtitle:
+        "We are analyzing your history and symptoms to map out your next cycle.",
+    },
   };
 
   const meta = stepMeta[step];
@@ -396,7 +630,9 @@ export default function LandingScreen() {
       // Step 1 – Nickname
       case 1:
         return (
-          <Animated.View style={[s.inputWrapper, { opacity: anim.bodyOpacity }]}>
+          <Animated.View
+            style={[s.inputWrapper, { opacity: anim.bodyOpacity }]}
+          >
             <TextInput
               style={s.input}
               placeholder="Enter Nickname..."
@@ -412,7 +648,9 @@ export default function LandingScreen() {
       // Step 2 – Birthday
       case 2:
         return (
-          <Animated.View style={[s.birthdayPickerShell, { opacity: anim.bodyOpacity }]}> 
+          <Animated.View
+            style={[s.birthdayPickerShell, { opacity: anim.bodyOpacity }]}
+          >
             <View style={s.birthdayField}>
               <TouchableOpacity
                 activeOpacity={0.9}
@@ -422,14 +660,23 @@ export default function LandingScreen() {
                 <Text
                   style={[
                     s.birthdayFieldText,
-                    birthday ? s.birthdayFieldValue : s.birthdayFieldPlaceholder,
+                    birthday
+                      ? s.birthdayFieldValue
+                      : s.birthdayFieldPlaceholder,
                   ]}
                 >
                   {birthday || "MM/DD/YY"}
                 </Text>
               </TouchableOpacity>
-              <TouchableOpacity activeOpacity={1} onPress={() => setBirthdayPickerOpen((v) => !v)}>
-                <Ionicons name={birthdayPickerOpen ? "chevron-up" : "chevron-down"} size={18} color="#B5D6EE" />
+              <TouchableOpacity
+                activeOpacity={1}
+                onPress={() => setBirthdayPickerOpen((v) => !v)}
+              >
+                <Ionicons
+                  name={birthdayPickerOpen ? "chevron-up" : "chevron-down"}
+                  size={18}
+                  color="#B5D6EE"
+                />
               </TouchableOpacity>
             </View>
 
@@ -437,43 +684,80 @@ export default function LandingScreen() {
               <View style={s.birthdayCalendarCard}>
                 <View style={s.birthdayCalendarInner}>
                   <View style={s.monthNav}>
-                    <TouchableOpacity activeOpacity={1} onPress={() => {
-                      if (birthdayViewMonth === 0) { setBirthdayViewMonth(11); setBirthdayViewYear((y) => y - 1); }
-                      else setBirthdayViewMonth((m) => m - 1);
-                    }}>
+                    <TouchableOpacity
+                      activeOpacity={1}
+                      onPress={() => {
+                        if (birthdayViewMonth === 0) {
+                          setBirthdayViewMonth(11);
+                          setBirthdayViewYear((y) => y - 1);
+                        } else setBirthdayViewMonth((m) => m - 1);
+                      }}
+                    >
                       <Text style={s.navArrow}>‹</Text>
                     </TouchableOpacity>
-                    <Text style={s.monthTitle}>{MONTHS[birthdayViewMonth]} {birthdayViewYear}</Text>
-                    <TouchableOpacity activeOpacity={1} onPress={() => {
-                      if (birthdayViewMonth === 11) { setBirthdayViewMonth(0); setBirthdayViewYear((y) => y + 1); }
-                      else setBirthdayViewMonth((m) => m + 1);
-                    }}>
+                    <Text style={s.monthTitle}>
+                      {MONTHS[birthdayViewMonth]} {birthdayViewYear}
+                    </Text>
+                    <TouchableOpacity
+                      activeOpacity={1}
+                      onPress={() => {
+                        if (birthdayViewMonth === 11) {
+                          setBirthdayViewMonth(0);
+                          setBirthdayViewYear((y) => y + 1);
+                        } else setBirthdayViewMonth((m) => m + 1);
+                      }}
+                    >
                       <Text style={s.navArrow}>›</Text>
                     </TouchableOpacity>
                   </View>
 
                   <View style={s.calRow}>
-                    {DAYS.map((d) => <Text key={d} style={s.dayHeader}>{d}</Text>)}
+                    {DAYS.map((d) => (
+                      <Text key={d} style={s.dayHeader}>
+                        {d}
+                      </Text>
+                    ))}
                   </View>
 
                   {(() => {
-                    const firstDay = getFirstDayOfMonth(birthdayViewYear, birthdayViewMonth);
-                    const daysInMonth = getDaysInMonth(birthdayViewYear, birthdayViewMonth);
-                    const cells: (number | null)[] = [...Array(firstDay).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => i + 1)];
+                    const firstDay = getFirstDayOfMonth(
+                      birthdayViewYear,
+                      birthdayViewMonth,
+                    );
+                    const daysInMonth = getDaysInMonth(
+                      birthdayViewYear,
+                      birthdayViewMonth,
+                    );
+                    const cells: (number | null)[] = [
+                      ...Array(firstDay).fill(null),
+                      ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
+                    ];
                     while (cells.length < 42) cells.push(null);
                     const weeks: (number | null)[][] = [];
-                    for (let i = 0; i < 42; i += 7) weeks.push(cells.slice(i, i + 7));
+                    for (let i = 0; i < 42; i += 7)
+                      weeks.push(cells.slice(i, i + 7));
 
                     return weeks.map((week, wi) => (
                       <View key={wi} style={s.calRow}>
                         {week.map((day, di) => {
-                          if (day === null) return <View key={di} style={s.dayCell} />;
-                          const chosen = formatShortDate(new Date(birthdayViewYear, birthdayViewMonth, day));
+                          if (day === null)
+                            return <View key={di} style={s.dayCell} />;
+                          const chosen = formatShortDate(
+                            new Date(birthdayViewYear, birthdayViewMonth, day),
+                          );
                           const isSel = birthday === chosen;
                           return (
                             <View key={di} style={s.dayCell}>
-                              <TouchableOpacity activeOpacity={1} onPress={() => selectBirthday(day)} style={[s.dayInner, isSel && s.dayPeriod]}>
-                                <Text style={[s.dayText, isSel && s.dayTextPeriod]}>{day}</Text>
+                              <TouchableOpacity
+                                activeOpacity={1}
+                                onPress={() => selectBirthday(day)}
+                                style={[s.dayInner, isSel && s.dayPeriod]}
+                              >
+                                <Text
+                                  style={[s.dayText, isSel && s.dayTextPeriod]}
+                                >
+                                  {day}
+                                </Text>
                               </TouchableOpacity>
                             </View>
                           );
@@ -481,7 +765,6 @@ export default function LandingScreen() {
                       </View>
                     ));
                   })()}
-
                 </View>
               </View>
             ) : null}
@@ -493,7 +776,8 @@ export default function LandingScreen() {
         return (
           <Animated.View style={{ opacity: anim.bodyOpacity }}>
             <Text style={[s.bodyText, { textAlign: "center" }]}>
-              Abyssal Flow is dedicated to tracking your menstrual cycle and symptoms.
+              Abyssal Flow is dedicated to tracking your menstrual cycle and
+              symptoms.
             </Text>
           </Animated.View>
         );
@@ -501,7 +785,9 @@ export default function LandingScreen() {
       // Step 4 – Cycle regularity
       case 4:
         return (
-          <Animated.View style={[s.listContainer, { opacity: anim.bodyOpacity }]}>
+          <Animated.View
+            style={[s.listContainer, { opacity: anim.bodyOpacity }]}
+          >
             {CYCLE_REGULARITY.map((opt) => {
               const sel = cycleRegularity === opt.id;
               return (
@@ -522,11 +808,15 @@ export default function LandingScreen() {
       // Step 5 – Health history (multi)
       case 5:
         return (
-          <Animated.View style={[s.listContainer, { opacity: anim.bodyOpacity }]}>
+          <Animated.View
+            style={[s.listContainer, { opacity: anim.bodyOpacity }]}
+          >
             <RadioList
               options={CONDITIONS}
               selected={healthHistory}
-              onSelect={(id) => toggleMulti(id, healthHistory, setHealthHistory, "none")}
+              onSelect={(id) =>
+                toggleMulti(id, healthHistory, setHealthHistory, "none")
+              }
               multi
             />
           </Animated.View>
@@ -535,7 +825,9 @@ export default function LandingScreen() {
       // Step 6 – Medical checkups (single)
       case 6:
         return (
-          <Animated.View style={[s.listContainer, { opacity: anim.bodyOpacity }]}>
+          <Animated.View
+            style={[s.listContainer, { opacity: anim.bodyOpacity }]}
+          >
             <RadioList
               options={CHECKUP_OPTIONS}
               selected={medicalCheckups ?? ""}
@@ -547,11 +839,15 @@ export default function LandingScreen() {
       // Step 7 – Medications (multi)
       case 7:
         return (
-          <Animated.View style={[s.listContainer, { opacity: anim.bodyOpacity }]}>
+          <Animated.View
+            style={[s.listContainer, { opacity: anim.bodyOpacity }]}
+          >
             <RadioList
               options={MEDICATIONS}
               selected={medications}
-              onSelect={(id) => toggleMulti(id, medications, setMedications, "none")}
+              onSelect={(id) =>
+                toggleMulti(id, medications, setMedications, "none")
+              }
               multi
             />
           </Animated.View>
@@ -562,23 +858,48 @@ export default function LandingScreen() {
         return (
           <Animated.View style={[s.calendar, { opacity: anim.bodyOpacity }]}>
             <View style={s.monthNav}>
-              <TouchableOpacity onPress={() => { if (currentMonth === 0) { setCurrentMonth(11); setCurrentYear((y) => y - 1); } else setCurrentMonth((m) => m - 1); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <TouchableOpacity
+                onPress={() => {
+                  if (currentMonth === 0) {
+                    setCurrentMonth(11);
+                    setCurrentYear((y) => y - 1);
+                  } else setCurrentMonth((m) => m - 1);
+                }}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
                 <Text style={s.navArrow}>‹</Text>
               </TouchableOpacity>
-              <Text style={s.monthTitle}>{MONTHS[currentMonth]} {currentYear}</Text>
-              <TouchableOpacity onPress={() => { if (currentMonth === 11) { setCurrentMonth(0); setCurrentYear((y) => y + 1); } else setCurrentMonth((m) => m + 1); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Text style={s.monthTitle}>
+                {MONTHS[currentMonth]} {currentYear}
+              </Text>
+              <TouchableOpacity
+                onPress={() => {
+                  if (currentMonth === 11) {
+                    setCurrentMonth(0);
+                    setCurrentYear((y) => y + 1);
+                  } else setCurrentMonth((m) => m + 1);
+                }}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
                 <Text style={s.navArrow}>›</Text>
               </TouchableOpacity>
             </View>
 
             <View style={s.calRow}>
-              {DAYS.map((d) => <Text key={d} style={s.dayHeader}>{d}</Text>)}
+              {DAYS.map((d) => (
+                <Text key={d} style={s.dayHeader}>
+                  {d}
+                </Text>
+              ))}
             </View>
 
             {(() => {
               const firstDay = getFirstDayOfMonth(currentYear, currentMonth);
               const daysInMonth = getDaysInMonth(currentYear, currentMonth);
-              const cells: (number | null)[] = [...Array(firstDay).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => i + 1)];
+              const cells: (number | null)[] = [
+                ...Array(firstDay).fill(null),
+                ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
+              ];
               while (cells.length < 42) cells.push(null);
               const weeks: (number | null)[][] = [];
               for (let i = 0; i < 42; i += 7) weeks.push(cells.slice(i, i + 7));
@@ -590,8 +911,14 @@ export default function LandingScreen() {
                     return (
                       <View key={di} style={s.dayCell}>
                         {day !== null ? (
-                          <TouchableOpacity activeOpacity={1} onPress={() => toggleDate(day)} style={[s.dayInner, sel && s.dayPeriod]}>
-                            <Text style={[s.dayText, sel && s.dayTextPeriod]}>{day}</Text>
+                          <TouchableOpacity
+                            activeOpacity={1}
+                            onPress={() => toggleDate(day)}
+                            style={[s.dayInner, sel && s.dayPeriod]}
+                          >
+                            <Text style={[s.dayText, sel && s.dayTextPeriod]}>
+                              {day}
+                            </Text>
                           </TouchableOpacity>
                         ) : (
                           <View style={s.dayInner} />
@@ -608,7 +935,9 @@ export default function LandingScreen() {
       // Step 9 – Cycle length picker
       case 9:
         return (
-          <Animated.View style={[s.cycleLengthShell, { opacity: anim.bodyOpacity }]}> 
+          <Animated.View
+            style={[s.cycleLengthShell, { opacity: anim.bodyOpacity }]}
+          >
             <View style={s.cycleLengthCard}>
               <TouchableOpacity
                 activeOpacity={1}
@@ -640,7 +969,9 @@ export default function LandingScreen() {
       // Step 10 – Typical flow
       case 10:
         return (
-          <Animated.View style={[s.listContainer, { opacity: anim.bodyOpacity }]}>
+          <Animated.View
+            style={[s.listContainer, { opacity: anim.bodyOpacity }]}
+          >
             <RadioList
               options={FLOW_OPTIONS}
               selected={typicalFlow ?? ""}
@@ -652,7 +983,9 @@ export default function LandingScreen() {
       // Step 11 – Symptoms (multi)
       case 11:
         return (
-          <Animated.View style={[s.listContainer, { opacity: anim.bodyOpacity }]}>
+          <Animated.View
+            style={[s.listContainer, { opacity: anim.bodyOpacity }]}
+          >
             <RadioList
               options={SYMPTOMS}
               selected={symptoms}
@@ -665,7 +998,9 @@ export default function LandingScreen() {
       // Step 12 – Moods (multi)
       case 12:
         return (
-          <Animated.View style={[s.listContainer, { opacity: anim.bodyOpacity }]}>
+          <Animated.View
+            style={[s.listContainer, { opacity: anim.bodyOpacity }]}
+          >
             <RadioList
               options={MOODS}
               selected={moods}
@@ -678,7 +1013,9 @@ export default function LandingScreen() {
       // Step 13 – Comfort food (multi)
       case 13:
         return (
-          <Animated.View style={[s.listContainer, { opacity: anim.bodyOpacity }]}>
+          <Animated.View
+            style={[s.listContainer, { opacity: anim.bodyOpacity }]}
+          >
             <RadioList
               options={FOODS}
               selected={comfortFood}
@@ -691,7 +1028,9 @@ export default function LandingScreen() {
       // Step 14 – Predicting / finish
       case 14:
         return (
-          <Animated.View style={[{ opacity: anim.bodyOpacity }, s.waterIconWrapper]}>
+          <Animated.View
+            style={[{ opacity: anim.bodyOpacity }, s.waterIconWrapper]}
+          >
             <WaterIcon />
           </Animated.View>
         );
@@ -749,14 +1088,23 @@ export default function LandingScreen() {
       </View>
 
       {/* Footer */}
-      <Animated.View style={[s.buttonContainer, { opacity: anim.buttonOpacity }]}>
+      <Animated.View
+        style={[s.buttonContainer, { opacity: anim.buttonOpacity }]}
+      >
         {renderDisclaimer()}
         <TouchableOpacity
           activeOpacity={1}
-          style={[s.button, !canProceed() && s.buttonDisabled]}
-          onPress={() => { if (canProceed()) goNext(); }}
+          style={[s.button, (!canProceed() || submitting) && s.buttonDisabled]}
+          onPress={async () => {
+            if (!canProceed()) return;
+            if (step < TOTAL_STEPS) goNext();
+            else await handleFinish();
+          }}
+          disabled={submitting}
         >
-          <Text style={s.buttonText}>{step === TOTAL_STEPS ? "Get Started" : "Next"}</Text>
+          <Text style={s.buttonText}>
+            {step === TOTAL_STEPS ? "Get Started" : "Next"}
+          </Text>
         </TouchableOpacity>
       </Animated.View>
     </View>
@@ -971,7 +1319,12 @@ const s = StyleSheet.create({
     marginRight: 14,
   },
   radioDotSelected: { borderColor: "#6DB4D8" },
-  radioDotInner: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#FFFFFF" },
+  radioDotInner: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#FFFFFF",
+  },
   optionLabel: {
     flex: 1,
     fontFamily: Platform.OS === "ios" ? "Georgia" : "serif",
@@ -999,9 +1352,19 @@ const s = StyleSheet.create({
     elevation: 0,
     width: "100%",
   },
-  calendarHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 },
+  calendarHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
   navButton: { padding: 2 },
-  navArrow: { color: "#B5BEC6", fontSize: 22, fontWeight: "300", lineHeight: 22 },
+  navArrow: {
+    color: "#B5BEC6",
+    fontSize: 22,
+    fontWeight: "300",
+    lineHeight: 22,
+  },
   monthLabel: {
     fontFamily: Platform.OS === "ios" ? "Georgia" : "serif",
     fontSize: 14,
@@ -1009,7 +1372,12 @@ const s = StyleSheet.create({
     color: "#FFFFFF",
     letterSpacing: 0.5,
   },
-  dayHeaders: { flexDirection: "row", marginBottom: 6, width: "86%", alignSelf: "center" },
+  dayHeaders: {
+    flexDirection: "row",
+    marginBottom: 6,
+    width: "86%",
+    alignSelf: "center",
+  },
   dayHeaderSlot: { width: "14.2857%", alignItems: "center" },
   dayHeader: {
     textAlign: "center",
@@ -1019,17 +1387,53 @@ const s = StyleSheet.create({
     letterSpacing: 1.2,
     color: "#B5BEC6",
   },
-  dayGrid: { rowGap: 6, width: "86%", alignSelf: "center", flexDirection: "row", flexWrap: "wrap", justifyContent: "flex-start" },
+  dayGrid: {
+    rowGap: 6,
+    width: "86%",
+    alignSelf: "center",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "flex-start",
+  },
   dayGridRow: { flexDirection: "row", alignItems: "center", marginBottom: 2 },
 
   // modal-like calendar styles (used for Step 8)
-  monthNav: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8, width: "86%", alignSelf: "center" },
-  monthTitle: { fontFamily: Platform.OS === "ios" ? "Georgia" : "serif", fontSize: 15, fontWeight: "600", color: "#E8F4FF", letterSpacing: 0.3 },
-  calRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 6, width: "86%", alignSelf: "center" },
+  monthNav: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 8,
+    width: "86%",
+    alignSelf: "center",
+  },
+  monthTitle: {
+    fontFamily: Platform.OS === "ios" ? "Georgia" : "serif",
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#E8F4FF",
+    letterSpacing: 0.3,
+  },
+  calRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 6,
+    width: "86%",
+    alignSelf: "center",
+  },
   dayCell: { flex: 1, alignItems: "center", paddingVertical: 4 },
-  dayInner: { width: 30, height: 30, borderRadius: 15, alignItems: "center", justifyContent: "center" },
+  dayInner: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   dayPeriod: { backgroundColor: "#ff4343" },
-  dayPredicted: { backgroundColor: "rgba(217, 48, 37, 0.25)", borderWidth: 1, borderColor: "rgba(217, 48, 37, 0.4)" },
+  dayPredicted: {
+    backgroundColor: "rgba(217, 48, 37, 0.25)",
+    borderWidth: 1,
+    borderColor: "rgba(217, 48, 37, 0.4)",
+  },
   dayText: { color: "#C8D8EC", fontSize: 13 },
   dayTextPeriod: { color: "#FFF", fontWeight: "700" },
 
@@ -1157,8 +1561,14 @@ const s = StyleSheet.create({
     zIndex: 1,
   },
   flatList: { width: "100%", height: ITEM_HEIGHT * VISIBLE_ITEMS },
-  flatListContent: { paddingVertical: ITEM_HEIGHT * Math.floor(VISIBLE_ITEMS / 2) },
-  pickerItem: { height: ITEM_HEIGHT, justifyContent: "center", alignItems: "center" },
+  flatListContent: {
+    paddingVertical: ITEM_HEIGHT * Math.floor(VISIBLE_ITEMS / 2),
+  },
+  pickerItem: {
+    height: ITEM_HEIGHT,
+    justifyContent: "center",
+    alignItems: "center",
+  },
   pickerItemSelected: {},
   pickerItemText: {
     fontFamily: Platform.OS === "ios" ? "Georgia" : "serif",
@@ -1171,9 +1581,26 @@ const s = StyleSheet.create({
 
   // Water icon (step 14)
   waterIconWrapper: { marginBottom: 28, alignItems: "center" },
-  waterIconContainer: { width: 80, height: 74, justifyContent: "center", alignItems: "center", gap: 10 },
-  waveLine: { width: 80, height: 12, justifyContent: "center", alignItems: "center" },
-  waveShape: { width: 80, height: 8, borderRadius: 4, backgroundColor: "#FFFFFF", opacity: 0.9 },
+  waterIconContainer: {
+    width: 80,
+    height: 74,
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 10,
+  },
+  waveLine: {
+    width: 80,
+    height: 12,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  waveShape: {
+    width: 80,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#FFFFFF",
+    opacity: 0.9,
+  },
 
   // Checkmark (step 15)
   checkmark: {

@@ -1,5 +1,6 @@
 import WaveBackground from "@/components/WaveBackground";
 import { OceanColors } from "@/constants/theme";
+import { supabaseClient } from "@/lib/supabase";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useMemo, useState } from "react";
@@ -31,13 +32,27 @@ export default function SignupScreen() {
 
   const { width, height } = Dimensions.get("window");
 
-  const TinySpeck = ({ top, left, opacity }: { top: number; left: number; opacity: number }) => {
+  const TinySpeck = ({
+    top,
+    left,
+    opacity,
+  }: {
+    top: number;
+    left: number;
+    opacity: number;
+  }) => {
     return <View style={[styles.speck, { top, left, opacity }]} />;
   };
 
   const BackgroundSparkles = () => {
     const specks = useMemo(
-      () => Array.from({ length: 60 }, (_, idx) => ({ id: idx, top: Math.random() * height, left: Math.random() * width, opacity: 0.25 + Math.random() * 0.45 })),
+      () =>
+        Array.from({ length: 60 }, (_, idx) => ({
+          id: idx,
+          top: Math.random() * height,
+          left: Math.random() * width,
+          opacity: 0.25 + Math.random() * 0.45,
+        })),
       [],
     );
 
@@ -56,21 +71,46 @@ export default function SignupScreen() {
       return;
     }
 
+    if (!username.trim()) {
+      alert("Username is required");
+      return;
+    }
+
     if (password !== confirmPassword) {
       alert("Passwords do not match");
       return;
     }
 
     setLoading(true);
-    try {
-      // TODO: Implement actual signup logic
-      console.log("Signup:", { username, email, password });
-      // After successful signup, navigate to main app
+
+    // 1. Call Supabase Auth
+    const { data, error } = await supabaseClient.auth.signUp({
+      email: email.trim().toLowerCase(),
+      password,
+      options: {
+        data: {
+          username: username.trim(),
+          terms_accepted: termsAccepted,
+        },
+      },
+    });
+
+    setLoading(false);
+
+    // 2. Handle Errors
+    if (error) {
+      alert(`Signup failed: ${error.message}`);
+      return;
+    }
+
+    // 3. Success!
+    // Since email confirmations are OFF, 'data.session' will instantly exist.
+    // We can skip the verify screen and jump straight into the app!
+    if (data.session) {
       router.push("/landing");
-    } catch (error) {
-      console.error("Signup error:", error);
-    } finally {
-      setLoading(false);
+    } else {
+      // (Fallback just in case you turn emails back on later)
+      router.push(`/auth/verify-otp?email=${encodeURIComponent(email)}` as any);
     }
   };
 
@@ -123,7 +163,7 @@ export default function SignupScreen() {
               />
             </View>
 
-            
+            {/* Email Input */}
             <View style={styles.inputContainer}>
               <MaterialIcons
                 name="mail-outline"
@@ -143,7 +183,7 @@ export default function SignupScreen() {
               />
             </View>
 
-            
+            {/* Password Input */}
             <View style={styles.inputContainer}>
               <MaterialIcons
                 name="lock-outline"
@@ -245,7 +285,10 @@ export default function SignupScreen() {
             {/* Login Link */}
             <View style={styles.loginContainer}>
               <Text style={styles.loginText}>Already have an account? </Text>
-              <TouchableOpacity activeOpacity={1} onPress={handleLoginNavigation}>
+              <TouchableOpacity
+                activeOpacity={1}
+                onPress={handleLoginNavigation}
+              >
                 <Text style={styles.loginLink}>Dive Back In.</Text>
               </TouchableOpacity>
             </View>
