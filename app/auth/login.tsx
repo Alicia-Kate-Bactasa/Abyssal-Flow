@@ -92,11 +92,10 @@ export default function LoginScreen() {
           {/* Logo/Brand Section */}
           <View style={styles.logoSection}>
             <Image
-              source={require("@/assets/images/abyssal-logo.png")}
+              source={require("@/assets/images/finalestLogo.png")}
               style={styles.logoImage}
               resizeMode="contain"
             />
-            <Text style={styles.brandName}>Abyssal Flow</Text>
           </View>
 
           {/* Main Heading */}
@@ -175,7 +174,7 @@ export default function LoginScreen() {
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>Reset Password</Text>
             <Text style={styles.modalCopy}>
-              Enter your email and we will send a recovery link that matches the Abyssal Flow theme.
+              Enter your email and we will send a recovery link.
             </Text>
             <TouchableOpacity
               activeOpacity={1}
@@ -218,20 +217,11 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   logoImage: {
-    width: 150,
-    height: 150,
+    width: 176,
+    height: 176,
     position: 'absolute',
-    top: 0,
+    top: -4,
   },
-  brandName: {
-    fontSize: 16,
-    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
-    color: OceanColors.textSecondary,
-    letterSpacing: 1,
-    position: 'absolute',
-    top: 153,
-  },
-
   speck: {
     position: 'absolute',
     width: 1,

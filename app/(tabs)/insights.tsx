@@ -120,7 +120,7 @@ const getContextMessage = (
   if (profile.typicalFlow === "heavy")
     return "Your heavier flow notes will help shape clearer tide predictions.";
   if (profile.medicalCheckups === "never")
-    return "Keep logging your tides so the forecast can stay accurate between checkups.";
+    return "Keep logging your cycle so the forecast can stay accurate between checkups.";
   if (profile.healthHistory.includes("pcos"))
     return "Your PCOS history can help the forecast stay tuned to longer cycle shifts.";
   if (profile.healthHistory.includes("endometriosis"))
@@ -223,6 +223,7 @@ export default function InsightsScreen() {
     getLogsForDate,
     getSymptomFrequencyForMonth,
     profile,
+    setSelectedLogDate,
   } = useCycleData();
 
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -236,6 +237,14 @@ export default function InsightsScreen() {
       setCurrentViewDate(new Date(latest.getFullYear(), latest.getMonth(), 1));
     }
   }, [getLatestPeriodStart, periodDates]);
+
+  useEffect(() => {
+    try {
+      if (setSelectedLogDate) setSelectedLogDate(selectedDate);
+    } catch {
+      // ignore
+    }
+  }, [selectedDate, setSelectedLogDate]);
 
   const cycleStats = getCycleStats();
   const selectedLog = getLogsForDate(selectedDate);
@@ -312,13 +321,25 @@ export default function InsightsScreen() {
           <PulsingHeading style={styles.monthLabelGlow}>
             {monthLabel}
           </PulsingHeading>
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
+            <TouchableOpacity
+              onPress={() => {
+                setCurrentViewDate(new Date());
+                setSelectedDate(new Date());
+              }}
+              style={styles.smallTodayButton}
+            >
+              <Text style={styles.smallTodayText}>Today</Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            onPress={handleNextMonth}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <Ionicons name="chevron-forward" size={18} color="#FFFFFF" />
-          </TouchableOpacity>
+            <TouchableOpacity
+              onPress={handleNextMonth}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              style={{ marginLeft: 8 }}
+            >
+              <Ionicons name="chevron-forward" size={18} color="#FFFFFF" />
+            </TouchableOpacity>
+          </View>
         </View>
 
         <View style={styles.weekRow}>
@@ -404,13 +425,13 @@ export default function InsightsScreen() {
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Oceanic Cycle Length</Text>
             <Text style={styles.summaryValue}>
-              {cycleStats.avgCycleLength} tides
+              {cycleStats.avgCycleLength} days
             </Text>
           </View>
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Tide Flow Duration</Text>
             <Text style={styles.summaryValue}>
-              {cycleStats.avgPeriodLength} tides
+              {cycleStats.avgPeriodLength} days
             </Text>
           </View>
           <View style={styles.summaryRow}>
@@ -420,6 +441,10 @@ export default function InsightsScreen() {
         </View>
 
         {renderCalendar()}
+
+        <Text style={styles.dashboardNote}>
+          This calendar is for viewing cycles only. To edit logs, go to Calendar Dashboard.
+        </Text>
 
         {/* Dynamic Daily Summary based on Calendar Selection */}
         <View style={styles.summaryCard}>
@@ -511,6 +536,14 @@ const styles = StyleSheet.create({
     textAlign: "center",
     color: "#FFFFFF",
   },
+  dashboardNote: {
+    color: "rgba(255,255,255,0.65)",
+    fontSize: 11,
+    lineHeight: 15,
+    textAlign: "center",
+    marginBottom: 16,
+    fontFamily: "monospace",
+  },
   subTitleGlow: {
     fontFamily: "Georgia",
     fontSize: 14,
@@ -528,6 +561,19 @@ const styles = StyleSheet.create({
     fontSize: 15,
     textAlign: "center",
     color: "#FFFFFF",
+  },
+  smallTodayButton: {
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 14,
+  },
+  smallTodayText: {
+    color: "#E1F2FF",
+    fontSize: 11,
+    fontFamily: "monospace",
   },
   // Layout and Card styles
   summaryCard: {

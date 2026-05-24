@@ -3,11 +3,13 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 
 type User = {
   nickname: string;
+  username?: string;
 };
 
 type UserContextType = {
   user: User;
   setNickname: (name: string) => void;
+  setUsername: (name: string) => void;
 };
 
 const USER_STORAGE_KEY = "@abyssal_user";
@@ -15,7 +17,7 @@ const USER_STORAGE_KEY = "@abyssal_user";
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
 export function UserProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User>({ nickname: "" });
+  const [user, setUser] = useState<User>({ nickname: "", username: undefined });
 
   useEffect(() => {
     let active = true;
@@ -24,22 +26,18 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       try {
         const { data } = await supabaseClient.auth.getUser();
         if (!active) return;
-        const nickname =
-          (data.user?.user_metadata?.username as string | undefined) ??
-          (data.user?.user_metadata?.nickname as string | undefined) ??
-          "";
-        if (nickname) setUser({ nickname });
+        const username = data.user?.user_metadata?.username as string | undefined;
+        const nickname = data.user?.user_metadata?.nickname as string | undefined;
+        setUser({ nickname: nickname ?? "", username });
       } catch {
         // ignore
       }
     })();
 
     const { data } = supabaseClient.auth.onAuthStateChange((_event, session) => {
-      const nickname =
-        (session?.user?.user_metadata?.username as string | undefined) ??
-        (session?.user?.user_metadata?.nickname as string | undefined) ??
-        "";
-      setUser({ nickname });
+      const username = session?.user?.user_metadata?.username as string | undefined;
+      const nickname = session?.user?.user_metadata?.nickname as string | undefined;
+      setUser({ nickname: nickname ?? "", username });
     });
 
     return () => {
@@ -53,8 +51,13 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const setNickname = (name: string) => setUser((u) => ({ ...u, nickname: name }));
+  const setUsername = (name: string) => setUser((u) => ({ ...u, username: name }));
 
-  return <UserContext.Provider value={{ user, setNickname }}>{children}</UserContext.Provider>;
+  return (
+    <UserContext.Provider value={{ user, setNickname, setUsername }}>
+      {children}
+    </UserContext.Provider>
+  );
 }
 
 export function useUser() {

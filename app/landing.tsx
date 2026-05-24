@@ -1,3 +1,4 @@
+import BottomSheetDatePicker from "@/components/BottomSheetDatePicker";
 import WaveBackground from "@/components/WaveBackground";
 import { formatDateKey, useCycleData } from "@/hooks/use-cycle-store";
 import { submitOnboarding } from "@/hooks/use-onboarding-submit";
@@ -50,12 +51,7 @@ function getDaysInMonth(year: number, month: number) {
 function getFirstDayOfMonth(year: number, month: number) {
   return new Date(year, month, 1).getDay();
 }
-function formatShortDate(date: Date) {
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  const year = String(date.getFullYear()).slice(-2);
-  return `${month}/${day}/${year}`;
-}
+// formatShortDate removed (not used here) - BottomSheetDatePicker returns short dates
 
 // ─── Data sets ───────────────────────────────────────────────────────────────
 const CONDITIONS = [
@@ -323,12 +319,8 @@ export default function LandingScreen() {
   const [nickname, setNickname] = useState("");
   const [birthday, setBirthday] = useState("");
   const [birthdayPickerOpen, setBirthdayPickerOpen] = useState(false);
-  const [birthdayViewYear, setBirthdayViewYear] = useState(
-    () => new Date().getFullYear() - 20,
-  );
-  const [birthdayViewMonth, setBirthdayViewMonth] = useState(() =>
-    new Date().getMonth(),
-  );
+
+  // picker initialization and animation removed — using BottomSheetDatePicker component
   const [cycleRegularity, setCycleRegularity] = useState<string | null>(null);
   const [healthHistory, setHealthHistory] = useState<string[]>([]);
   const [medicalCheckups, setMedicalCheckups] = useState<string | null>(null);
@@ -341,7 +333,7 @@ export default function LandingScreen() {
 
   // Calendar state (Step 8)
   const now = new Date();
-  const [currentYear, setCurrentYear] = useState(now.getFullYear());
+  const [calendarYear, setCalendarYear] = useState(now.getFullYear());
   const [currentMonth, setCurrentMonth] = useState(now.getMonth());
 
   const anim = useStepAnimation();
@@ -409,16 +401,24 @@ export default function LandingScreen() {
 
   // ── Calendar helpers (Step 8) ───────────────────────────────────────────────
   const toggleDate = (day: number) => {
-    togglePeriodDate(new Date(currentYear, currentMonth, day));
+    togglePeriodDate(new Date(calendarYear, currentMonth, day));
   };
   const isDateSelected = (day: number) =>
-    !!periodDates[formatDateKey(new Date(currentYear, currentMonth, day))];
+    !!periodDates[formatDateKey(new Date(calendarYear, currentMonth, day))];
 
-  const selectBirthday = (day: number) => {
-    const chosen = new Date(birthdayViewYear, birthdayViewMonth, day);
-    setBirthday(formatShortDate(chosen));
-    setBirthdayPickerOpen(false);
-  };
+  // legacy calendar selection removed — replaced by wheel picker
+
+  function parseShortToParts(short: string) {
+    if (!short) return null;
+    const parts = short.split("/");
+    if (parts.length !== 3) return null;
+    const m = Number(parts[0]) - 1;
+    const d = Number(parts[1]);
+    const yy = Number(parts[2]);
+    const currentTwo = new Date().getFullYear() % 100;
+    const fullYear = yy <= currentTwo ? 2000 + yy : 1900 + yy;
+    return { year: fullYear, month: m, day: d };
+  }
 
   // birthday parsing helpers removed
 
@@ -546,6 +546,24 @@ export default function LandingScreen() {
 
       setUserNickname(payload.nickname);
 
+      // Update local cycle-store profile so predictions use onboarding data immediately
+      try {
+        updateProfile({
+          nickname: payload.nickname,
+          birthday: payload.birthday,
+          cycleRegularity: payload.cycleRegularity,
+          medicalCheckups: payload.medicalCheckups,
+          medications: medications,
+          typicalFlow: payload.typicalFlow,
+          symptoms: symptoms,
+          moods: moods,
+          comfortFood: comfortFood,
+          cycleLength: payload.cycleLength,
+        });
+      } catch {
+        // non-fatal
+      }
+
       await submitOnboarding(payload as any);
       // Refresh authoritative cycles from server so predictions use only saved data
       try {
@@ -667,15 +685,13 @@ export default function LandingScreen() {
             <View style={s.birthdayField}>
               <TouchableOpacity
                 activeOpacity={0.9}
-                onPress={() => setBirthdayPickerOpen((v) => !v)}
+                onPress={() => setBirthdayPickerOpen(true)}
                 style={s.birthdayFieldTouch}
               >
                 <Text
                   style={[
                     s.birthdayFieldText,
-                    birthday
-                      ? s.birthdayFieldValue
-                      : s.birthdayFieldPlaceholder,
+                    birthday ? s.birthdayFieldValue : s.birthdayFieldPlaceholder,
                   ]}
                 >
                   {birthday || "MM/DD/YY"}
@@ -683,7 +699,7 @@ export default function LandingScreen() {
               </TouchableOpacity>
               <TouchableOpacity
                 activeOpacity={1}
-                onPress={() => setBirthdayPickerOpen((v) => !v)}
+                onPress={() => setBirthdayPickerOpen(true)}
               >
                 <Ionicons
                   name={birthdayPickerOpen ? "chevron-up" : "chevron-down"}
@@ -693,94 +709,15 @@ export default function LandingScreen() {
               </TouchableOpacity>
             </View>
 
-            {birthdayPickerOpen ? (
-              <View style={s.birthdayCalendarCard}>
-                <View style={s.birthdayCalendarInner}>
-                  <View style={s.monthNav}>
-                    <TouchableOpacity
-                      activeOpacity={1}
-                      onPress={() => {
-                        if (birthdayViewMonth === 0) {
-                          setBirthdayViewMonth(11);
-                          setBirthdayViewYear((y) => y - 1);
-                        } else setBirthdayViewMonth((m) => m - 1);
-                      }}
-                    >
-                      <Text style={s.navArrow}>‹</Text>
-                    </TouchableOpacity>
-                    <Text style={s.monthTitle}>
-                      {MONTHS[birthdayViewMonth]} {birthdayViewYear}
-                    </Text>
-                    <TouchableOpacity
-                      activeOpacity={1}
-                      onPress={() => {
-                        if (birthdayViewMonth === 11) {
-                          setBirthdayViewMonth(0);
-                          setBirthdayViewYear((y) => y + 1);
-                        } else setBirthdayViewMonth((m) => m + 1);
-                      }}
-                    >
-                      <Text style={s.navArrow}>›</Text>
-                    </TouchableOpacity>
-                  </View>
-
-                  <View style={s.calRow}>
-                    {DAYS.map((d) => (
-                      <Text key={d} style={s.dayHeader}>
-                        {d}
-                      </Text>
-                    ))}
-                  </View>
-
-                  {(() => {
-                    const firstDay = getFirstDayOfMonth(
-                      birthdayViewYear,
-                      birthdayViewMonth,
-                    );
-                    const daysInMonth = getDaysInMonth(
-                      birthdayViewYear,
-                      birthdayViewMonth,
-                    );
-                    const cells: (number | null)[] = [
-                      ...Array(firstDay).fill(null),
-                      ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
-                    ];
-                    while (cells.length < 42) cells.push(null);
-                    const weeks: (number | null)[][] = [];
-                    for (let i = 0; i < 42; i += 7)
-                      weeks.push(cells.slice(i, i + 7));
-
-                    return weeks.map((week, wi) => (
-                      <View key={wi} style={s.calRow}>
-                        {week.map((day, di) => {
-                          if (day === null)
-                            return <View key={di} style={s.dayCell} />;
-                          const chosen = formatShortDate(
-                            new Date(birthdayViewYear, birthdayViewMonth, day),
-                          );
-                          const isSel = birthday === chosen;
-                          return (
-                            <View key={di} style={s.dayCell}>
-                              <TouchableOpacity
-                                activeOpacity={1}
-                                onPress={() => selectBirthday(day)}
-                                style={[s.dayInner, isSel && s.dayPeriod]}
-                              >
-                                <Text
-                                  style={[s.dayText, isSel && s.dayTextPeriod]}
-                                >
-                                  {day}
-                                </Text>
-                              </TouchableOpacity>
-                            </View>
-                          );
-                        })}
-                      </View>
-                    ));
-                  })()}
-                </View>
-              </View>
-            ) : null}
+            <BottomSheetDatePicker
+              visible={birthdayPickerOpen}
+              initialDate={parseShortToParts(birthday) ? new Date(parseShortToParts(birthday)!.year, parseShortToParts(birthday)!.month, parseShortToParts(birthday)!.day) : undefined}
+              onCancel={() => setBirthdayPickerOpen(false)}
+              onConfirm={(short) => {
+                setBirthday(short);
+                setBirthdayPickerOpen(false);
+              }}
+            />
           </Animated.View>
         );
 
@@ -875,7 +812,7 @@ export default function LandingScreen() {
                 onPress={() => {
                   if (currentMonth === 0) {
                     setCurrentMonth(11);
-                    setCurrentYear((y) => y - 1);
+                    setCalendarYear((y) => y - 1);
                   } else setCurrentMonth((m) => m - 1);
                 }}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -883,13 +820,13 @@ export default function LandingScreen() {
                 <Text style={s.navArrow}>‹</Text>
               </TouchableOpacity>
               <Text style={s.monthTitle}>
-                {MONTHS[currentMonth]} {currentYear}
+                {MONTHS[currentMonth]} {calendarYear}
               </Text>
               <TouchableOpacity
                 onPress={() => {
                   if (currentMonth === 11) {
                     setCurrentMonth(0);
-                    setCurrentYear((y) => y + 1);
+                    setCalendarYear((y) => y + 1);
                   } else setCurrentMonth((m) => m + 1);
                 }}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -907,8 +844,8 @@ export default function LandingScreen() {
             </View>
 
             {(() => {
-              const firstDay = getFirstDayOfMonth(currentYear, currentMonth);
-              const daysInMonth = getDaysInMonth(currentYear, currentMonth);
+                const firstDay = getFirstDayOfMonth(calendarYear, currentMonth);
+                  const daysInMonth = getDaysInMonth(calendarYear, currentMonth);
               const cells: (number | null)[] = [
                 ...Array(firstDay).fill(null),
                 ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
@@ -1490,7 +1427,7 @@ const s = StyleSheet.create({
     minHeight: 220,
     borderWidth: 0.3,
     borderColor: "rgba(181,230,255,0.22)",
-    backgroundColor: "rgba(11, 43, 96, 0.82)",
+    backgroundColor: "rgba(15, 67, 151, 0.82)",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.22,

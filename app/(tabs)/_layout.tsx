@@ -4,18 +4,33 @@ import * as Haptics from "expo-haptics";
 import { Tabs } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
-    Animated,
-    Modal,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    TouchableWithoutFeedback,
-    View,
-    useWindowDimensions,
+  Animated,
+  Image,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  View,
+  useWindowDimensions,
 } from "react-native";
 import Svg, { Path } from "react-native-svg";
+// selected log date moved into cycle store
+import {
+  EmojiAngry,
+  EmojiFrown,
+  EmojiGrimace,
+  EmojiGrinFill,
+  EmojiLaughing,
+  EmojiNeutral,
+  EmojiSmileUpsideDown,
+  EmojiSurprise,
+  ForkKnife,
+  MoonStarsFill,
+} from "../components/LogIcons";
 
 const C = {
   bar: "rgba(0, 23, 83, 0.65)",
@@ -215,7 +230,7 @@ function CalendarSection({ year, month, selectedDays, predictedDays, hasChanges,
 
   return (
     <View style={styles.calSection}>
-      <Text style={styles.sectionHeader}>Edit Period</Text>
+      <Text style={styles.sectionHeader}>Log Period</Text>
       <View style={styles.monthNav}>
         <TouchableOpacity onPress={onPrevMonth} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
           <Ionicons name="chevron-back" size={18} color="#A0B4D0" />
@@ -254,13 +269,121 @@ function CalendarSection({ year, month, selectedDays, predictedDays, hasChanges,
 
 const MOODS = ["Happy", "Sad", "Sensitive", "Angry", "Calm", "Anxious", "Energetic", "Apathetic"];
 const SYMPTOMS = ["Cramps", "Bloating", "Headache", "Acne", "Backache", "Tender Breasts", "Nausea", "Fatigue", "Cravings"];
+
+// Map moods to inline SVG components (safe) or raster requires
+const MOOD_ICON_MAP: Record<string, any> = {
+  Happy: EmojiLaughing,
+  Sad: EmojiFrown,
+  Sensitive: EmojiSmileUpsideDown,
+  Angry: EmojiAngry,
+  Calm: EmojiNeutral,
+  Anxious: EmojiGrimace,
+  Energetic: EmojiGrinFill,
+  Apathetic: EmojiSurprise,
+};
+
+// Map symptoms — PNGs use require so we can prefetch and make them large; a few SVGs use inline components
+const SYMPTOM_ICON_MAP: Record<string, any> = {
+  Cramps: require("../../assets/images/cramp.png"),
+  Bloating: require("../../assets/images/bloat.png"),
+  Headache: require("../../assets/images/headache.png"),
+  Acne: require("../../assets/images/acne.png"),
+  Backache: require("../../assets/images/backache.png"),
+  "Tender Breasts": require("../../assets/images/td.png"),
+  Nausea: require("../../assets/images/nausea.png"),
+  Fatigue: MoonStarsFill,
+  Cravings: ForkKnife,
+};
+
+// Preload only raster images (PNGs) to avoid SVG decode issues
+function usePreloadLogIcons() {
+  useEffect(() => {
+    try {
+      const all = [...Object.values(SYMPTOM_ICON_MAP), ...Object.values(MOOD_ICON_MAP)];
+      all.forEach((src) => {
+        try {
+          if (typeof src === "function") return; // inline SVG component
+          const resolved: any = Image.resolveAssetSource(src);
+          const uri: string | undefined = resolved?.uri;
+          if (uri && !uri.toLowerCase().endsWith(".svg")) {
+            Image.prefetch(uri);
+          }
+        } catch {
+          // ignore
+        }
+      });
+    } catch {
+      // ignore
+    }
+  }, []);
+}
+
+  function LogItem({
+    label,
+    active,
+    onPress,
+    src,
+    initials,
+  }: {
+    label: string;
+    active: boolean;
+    onPress: () => void;
+    src: any;
+    initials: string;
+  }) {
+    const [showTip, setShowTip] = useState(false);
+
+    const show = () => setShowTip(true);
+    const hide = () => setShowTip(false);
+
+    const pressableExtra: any = Platform.OS === "web" ? { onMouseEnter: show, onMouseLeave: hide } : {};
+
+    return (
+      <View style={{ alignItems: "center", justifyContent: "center", position: "relative" }}>
+        <Pressable
+          {...pressableExtra}
+          onPress={onPress}
+          onLongPress={() => { if (Platform.OS !== "web") show(); }}
+          onPressOut={() => { if (Platform.OS !== "web") hide(); }}
+          style={({ pressed }) => [styles.logCircle, active && styles.logCircleActive, pressed && { opacity: 0.85 }]}
+        >
+          {src ? (
+            (() => {
+              if (typeof src === "function") {
+                const IconComp = src as any;
+                return <IconComp size={28} color={active ? "#001753" : "#ebf4ff"} />;
+              }
+              try {
+                const resolved: any = Image.resolveAssetSource(src);
+                const uri: string | undefined = resolved?.uri;
+                const isSvg = uri ? uri.toLowerCase().endsWith(".svg") : false;
+                if (!isSvg) {
+                  return <Image source={src} style={{ width: 67, height: 67 }} resizeMode="contain" />;
+                }
+              } catch {
+                // fall back
+              }
+              return <Text style={[styles.logText, active && styles.logTextActive]}>{initials}</Text>;
+            })()
+          ) : (
+            <Text style={[styles.logText, active && styles.logTextActive]}>{initials}</Text>
+          )}
+        </Pressable>
+        {showTip && (
+          <View style={styles.tooltip} pointerEvents="none">
+            <Text style={styles.tooltipText}>{label}</Text>
+          </View>
+        )}
+      </View>
+    );
+  }
 const TODAY = new Date();
 const INITIAL_YEAR = TODAY.getFullYear();
 const INITIAL_MONTH = TODAY.getMonth();
 
 function AddModal({ visible, onClose }: { visible: boolean; onClose: () => void; }) {
   const {
-    getPeriodDaysForMonth, getPredictedDaysForMonth, setPeriodDatesForMonth, recalcPredictions, logMoodSymptoms,
+    getPeriodDaysForMonth, getPredictedDaysForMonth, setPeriodDatesForMonth, recalcPredictions, logMoodSymptoms, getSelectedLogDate,
   } = useCycleData();
   const [viewYear, setViewYear] = useState(INITIAL_YEAR);
   const [viewMonth, setViewMonth] = useState(INITIAL_MONTH);
@@ -305,11 +428,14 @@ function AddModal({ visible, onClose }: { visible: boolean; onClose: () => void;
   const toggleSelected = (value: string, setSelected: any) => setSelected((prev: string[]) => prev.includes(value) ? prev.filter((item: string) => item !== value) : [...prev, value]);
 
   const handleLog = () => {
-    logMoodSymptoms(new Date(), selectedMoods, selectedSymptoms);
+    const sel = getSelectedLogDate();
+    const target = sel ?? new Date();
+    logMoodSymptoms(target, selectedMoods, selectedSymptoms);
     setSelectedMoods([]);
     setSelectedSymptoms([]);
     onClose();
   };
+  usePreloadLogIcons();
 
   return (
     <Modal visible={visible} transparent animationType="fade" statusBarTranslucent onRequestClose={handleClose}>
@@ -329,10 +455,16 @@ function AddModal({ visible, onClose }: { visible: boolean; onClose: () => void;
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.logRow}>
             {MOODS.map((mood) => {
               const active = selectedMoods.includes(mood);
+              const src = MOOD_ICON_MAP[mood];
               return (
-                <Pressable key={mood} style={[styles.logCircle, active && styles.logCircleActive]} onPress={() => toggleSelected(mood, setSelectedMoods)}>
-                  <Text style={[styles.logText, active && styles.logTextActive]}>{mood.slice(0, 2).toUpperCase()}</Text>
-                </Pressable>
+                <LogItem
+                  key={mood}
+                  label={mood}
+                  initials={mood.slice(0, 2).toUpperCase()}
+                  active={active}
+                  src={src}
+                  onPress={() => toggleSelected(mood, setSelectedMoods)}
+                />
               );
             })}
           </ScrollView>
@@ -340,16 +472,33 @@ function AddModal({ visible, onClose }: { visible: boolean; onClose: () => void;
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.logRow}>
             {SYMPTOMS.map((symptom) => {
               const active = selectedSymptoms.includes(symptom);
+              const src = SYMPTOM_ICON_MAP[symptom];
               return (
-                <Pressable key={symptom} style={[styles.logCircle, active && styles.logCircleActive]} onPress={() => toggleSelected(symptom, setSelectedSymptoms)}>
-                  <Text style={[styles.logText, active && styles.logTextActive]}>{symptom.split(" ").map((word) => word[0]).join("").toUpperCase()}</Text>
-                </Pressable>
+                <LogItem
+                  key={symptom}
+                  label={symptom}
+                  initials={symptom.split(" ").map((word) => word[0]).join("").toUpperCase()}
+                  active={active}
+                  src={src}
+                  onPress={() => toggleSelected(symptom, setSelectedSymptoms)}
+                />
               );
             })}
           </ScrollView>
           <Pressable onPress={hasLogSelection ? handleLog : undefined} style={[styles.logBtn, !hasLogSelection && styles.logBtnDim]}>
             <Text style={[styles.logBtnText, !hasLogSelection && styles.logBtnTextDim]}>Log</Text>
           </Pressable>
+          <View style={styles.loggingHintContainer}>
+            <Text style={styles.loggingHintText}>
+              {(() => {
+                const sel = getSelectedLogDate ? getSelectedLogDate() : null;
+                const label = sel
+                  ? sel.toLocaleDateString("default", { month: "long", day: "numeric", year: "numeric" })
+                  : "Today";
+                return `Logging for: ${label}`;
+              })()}
+            </Text>
+          </View>
         </View>
       </View>
     </Modal>
@@ -358,6 +507,15 @@ function AddModal({ visible, onClose }: { visible: boolean; onClose: () => void;
 
 export default function TabLayout() {
   const [modalOpen, setModalOpen] = useState(false);
+  const { logModalRequestCount } = useCycleData();
+  const lastRequestRef = useRef(0);
+
+  useEffect(() => {
+    if (logModalRequestCount > lastRequestRef.current) {
+      lastRequestRef.current = logModalRequestCount;
+      setModalOpen(true);
+    }
+  }, [logModalRequestCount]);
 
   return (
     <>
@@ -460,6 +618,10 @@ const styles = StyleSheet.create({
   logCircleActive: { backgroundColor: "#64B5F6", borderColor: "#64B5F6" },
   logText: { color: "#ebf4ff", fontSize: 11, fontWeight: "600", letterSpacing: 0.6 },
   logTextActive: { color: "#001753" },
+  tooltip: { position: "absolute", top: -28, backgroundColor: "rgba(0,0,0,0.72)", paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, zIndex: 40 },
+  tooltipText: { color: "#fff", fontSize: 12, fontWeight: "600" },
+  loggingHintContainer: { alignSelf: "center", marginTop: 10, marginBottom: 12 },
+  loggingHintText: { color: "#C8D8EC", fontSize: 11, letterSpacing: 0.35 },
   logBtn: { marginTop: 4, backgroundColor: "transparent", borderRadius: 16, paddingVertical: 10, paddingHorizontal: 12, alignItems: "center", alignSelf: "center", width: 88, borderWidth: 0.2, borderColor: "rgba(232,244,255,0.55)" },
   logBtnDim: { opacity: 0.3 },
   logBtnText: { color: "#E8F4FF", fontSize: 12, fontWeight: "600", letterSpacing: 0.6 },

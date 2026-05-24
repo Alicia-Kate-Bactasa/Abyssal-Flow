@@ -21,8 +21,8 @@ import {
 
 export default function SignupScreen() {
   const router = useRouter();
-  const { setNickname } = useUser();
-  const [username, setUsername] = useState("");
+  const { setNickname, setUsername } = useUser();
+  const [username, setLocalUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -106,6 +106,7 @@ export default function SignupScreen() {
     }
 
     setNickname(username.trim());
+    setUsername(username.trim());
 
     // 3. Success!
     // Since email confirmations are OFF, 'data.session' will instantly exist.
@@ -138,11 +139,10 @@ export default function SignupScreen() {
             {/* Logo/Brand Section */}
             <View style={styles.logoSection}>
               <Image
-                source={require("@/assets/images/abyssal-logo.png")}
+                source={require("@/assets/images/finalestLogo.png")}
                 style={styles.logoImage}
                 resizeMode="contain"
               />
-              <Text style={styles.brandName}>Abyssal Flow</Text>
             </View>
 
             {/* Main Heading */}
@@ -161,7 +161,7 @@ export default function SignupScreen() {
                 placeholder="Username"
                 placeholderTextColor="rgba(255,255,255,0.6)"
                 value={username}
-                onChangeText={setUsername}
+                onChangeText={setLocalUsername}
                 autoCapitalize="none"
                 editable={!loading}
               />
@@ -353,20 +353,11 @@ const styles = StyleSheet.create({
     position: "relative",
   },
   logoImage: {
-    width: 150,
-    height: 150,
+    width: 176,
+    height: 176,
     position: "absolute",
-    top: 0,
+    top: -4,
   },
-  brandName: {
-    fontSize: 16,
-    fontFamily: Platform.OS === "ios" ? "Georgia" : "serif",
-    color: OceanColors.textSecondary,
-    letterSpacing: 1,
-    position: "absolute",
-    top: 153,
-  },
-
   speck: {
     position: "absolute",
     width: 1,

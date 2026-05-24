@@ -4,6 +4,7 @@ import { useRouter } from "expo-router";
 import React, { useMemo, useState } from "react";
 import {
     Dimensions,
+    Image,
     Modal,
     Pressable,
     ScrollView,
@@ -67,15 +68,10 @@ export default function ProfileScreen() {
         ]}
       >
         <View style={styles.avatarWrapper}>
-          <View style={styles.avatarCircle}>
-            <Text style={styles.avatarIcon}></Text>
-          </View>
-          <View style={styles.avatarBadge}>
-            <Text style={styles.avatarBadgeText}>+</Text>
-          </View>
+          <Image source={require("../../assets/images/profile.png")} style={styles.avatarImage} />
         </View>
 
-        <Text style={styles.name}>{user.nickname || "Profile"}</Text>
+        <Text style={styles.name}>{(user.username && user.username.trim()) ? user.username.trim() : (user.nickname || "Profile")}</Text>
         <Text style={styles.sectionLabel}>Description:</Text>
         <TextInput
           style={styles.descriptionBox}
@@ -165,6 +161,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   avatarIcon: { fontSize: 40, color: "#FFFFFF" },
+  avatarImage: { width: 180, height: 180, borderRadius: 90 },
   avatarBadge: {
     position: "absolute",
     right: 0,

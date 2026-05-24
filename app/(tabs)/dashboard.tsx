@@ -1,4 +1,4 @@
-import { useCycleData } from "@/hooks/use-cycle-store";
+import { formatDateKey, useCycleData } from "@/hooks/use-cycle-store";
 import { useUser } from "@/hooks/use-user-store";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
@@ -10,6 +10,7 @@ import {
   PanResponder,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from "react-native";
 import Svg, { Path } from "react-native-svg";
@@ -193,12 +194,14 @@ const CircularCalendarDial = ({
   activeDay,
   moonColor,
   anchorCycleDay,
+  onProvideReset,
 }: {
   onDayChange: (day: number) => void;
   onDateChange: (date: Date) => void;
   activeDay: number;
   moonColor: string;
   anchorCycleDay: number;
+  onProvideReset?: (fn: () => void) => void;
 }) => {
   const [viewDate, setViewDate] = useState(new Date());
 
@@ -222,11 +225,11 @@ const CircularCalendarDial = ({
   
   const previousAngleRef = useRef(0);
 
-  const inactivityTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastTickRef = useRef(Math.round(initialRotationAngle / angleSlice));
 
   useEffect(() => {
     onDateChange(viewDate);
+    // selected log date will be synced by Dashboard component using cycle store
   }, [onDateChange, viewDate]);
 
   const normalizeAngleToMonth = useCallback(
@@ -330,10 +333,11 @@ const CircularCalendarDial = ({
     }).start();
   }, [rotationAngle]);
 
-  const startInactivityTimer = useCallback(() => {
-    if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
-    inactivityTimer.current = setTimeout(resetToToday, 5000);
-  }, [resetToToday]);
+  useEffect(() => {
+    if (onProvideReset) onProvideReset(resetToToday);
+  }, [onProvideReset, resetToToday]);
+
+  // inactivity auto-reset removed — explicit Today button is used instead
 
   const snapToNearest = useCallback(
     (fromVelocityDegPerMs = 0) => {
@@ -360,8 +364,9 @@ const CircularCalendarDial = ({
             currentAngleRef.current = normalized.angle;
           }
           onDayChange(snappedDay);
-          onDateChange(new Date(normalized.year, normalized.month, snappedDay));
-          startInactivityTimer();
+          const snappedDate = new Date(normalized.year, normalized.month, snappedDay);
+          onDateChange(snappedDate);
+          // Dashboard will sync selected log date from footerDate
         }
       });
     },
@@ -373,16 +378,10 @@ const CircularCalendarDial = ({
         onDayChange,
         normalizeAngleToMonth,
         rotationAngle,
-        startInactivityTimer,
     ],
   );
 
-  useEffect(() => {
-    startInactivityTimer();
-    return () => {
-      if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
-    };
-  }, [startInactivityTimer]);
+  // no inactivity timer
 
   const panResponder = useRef(
     PanResponder.create({
@@ -394,7 +393,6 @@ const CircularCalendarDial = ({
       onStartShouldSetPanResponder: () => false,
 
       onPanResponderGrant: (_evt, gs) => {
-        if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
         rotationAngle.stopAnimation((stoppedAt) => {
           currentAngleRef.current = stoppedAt;
         });
@@ -535,17 +533,43 @@ const CircularCalendarDial = ({
 // 2. THE MAIN SCREEN EXPORT
 // ==========================================
 export default function Dashboard() {
-  const { getCycleStats, getLatestPeriodStart } = useCycleData();
+  const cycleData = useCycleData() as any;
+  const { getCycleStats, getLatestPeriodStart, daysLate, requestLogModal, setSelectedLogDate, periodDates } = cycleData;
   const { user } = useUser();
+  const [resetToTodayFn, setResetToTodayFn] = useState<(() => void) | null>(null);
   const [activeDay, setActiveDay] = useState(new Date().getDate());
   const [footerDate, setFooterDate] = useState(new Date());
+  useEffect(() => {
+    try {
+      if (typeof setSelectedLogDate === "function") {
+        setSelectedLogDate(footerDate);
+      }
+    } catch {
+      // ignore
+    }
+  }, [footerDate, setSelectedLogDate]);
   const cycleStats = getCycleStats();
   const latestPeriodStart = getLatestPeriodStart();
   const cycleLength = cycleStats.cycleLength;
+  const rawGreetingName =
+    (cycleData.profile?.nickname && cycleData.profile.nickname.trim()) ||
+    (user.nickname && user.nickname.trim()) ||
+    (user.username && user.username.trim()) ||
+    "";
+  const greetingName =
+    rawGreetingName &&
+    !/^[-\s]+$/.test(rawGreetingName) &&
+    rawGreetingName.toLowerCase() !== "profile"
+      ? rawGreetingName
+      : "there";
   const cycleDay = latestPeriodStart
     ? getCycleDayFromDates(latestPeriodStart, footerDate, cycleLength)
     : getCycleDay(activeDay, cycleLength);
-  const phaseKey = getPhaseKey(cycleDay, cycleLength);
+  let phaseKey = getPhaseKey(cycleDay, cycleLength);
+  const isLoggedPeriodDay = Boolean(periodDates?.[formatDateKey(footerDate)]);
+  const isMissed = typeof cycleData.isDateInMissedPredictedWindow === "function" ? cycleData.isDateInMissedPredictedWindow(new Date()) : false;
+  if (isLoggedPeriodDay) phaseKey = "menstrual";
+  else if (isMissed) phaseKey = "luteal";
   const phase = PHASES[phaseKey];
   const daysUntilPeriod = cycleLength - cycleDay + 1;
 
@@ -555,6 +579,9 @@ export default function Dashboard() {
   const waveFromRef = useRef(phase.wavePoints);
   const waveToRef = useRef(phase.wavePoints);
   const [wavePath, setWavePath] = useState(buildWavePath(phase.wavePoints));
+  const handleProvideReset = useCallback((fn: () => void) => {
+    setResetToTodayFn(() => fn);
+  }, []);
 
   useEffect(() => {
     if (phaseKey !== previousPhaseKey) {
@@ -623,6 +650,7 @@ export default function Dashboard() {
           activeDay={activeDay}
           moonColor={phase.moonColor}
           anchorCycleDay={cycleDay}
+          onProvideReset={handleProvideReset}
         />
       </View>
 
@@ -637,22 +665,54 @@ export default function Dashboard() {
 
       <View style={styles.contentOverlay} pointerEvents="box-none">
         <View style={styles.header} pointerEvents="box-none">
-          <Text style={styles.greeting}>Hello, {(user.nickname && user.nickname.trim()) ? user.nickname.trim() : "Profile"}!</Text>
-          <Text style={styles.subGreeting}>{subGreetingText}</Text>
+          <Text style={styles.greeting}>Hello, {greetingName}!</Text>
+          {daysLate > 0 && !isLoggedPeriodDay ? (
+            <Text style={styles.delayed}>
+              {daysLate === 1 ? "1 day period delayed" : `${daysLate} days period delayed`}
+            </Text>
+          ) : (
+            <Text style={styles.subGreeting}>{subGreetingText}</Text>
+          )}
           <View style={styles.divider} />
           <Text style={styles.phaseTitle}>{phase.title}</Text>
           <Text style={styles.phaseDescription}>{phase.description}</Text>
         </View>
 
-        <View style={styles.bottomInfo} pointerEvents="none">
-          <Text style={styles.bigDayText}>DAY {cycleDay}</Text>
-          <Text style={styles.ofCycle}>of cycle</Text>
-          <Text style={styles.monthFooter}>
-            {footerDate
-              .toLocaleString("default", { month: "long" })
-              .toUpperCase()}
-          </Text>
-        </View>
+        <View style={styles.bottomInfo} pointerEvents="box-none">
+            <View style={styles.bottomPrimaryCluster}>
+            {resetToTodayFn ? (
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={() => resetToTodayFn && resetToTodayFn()}
+                style={styles.smallTodayButton}
+              >
+                <Text style={styles.smallTodayText}>Today</Text>
+              </TouchableOpacity>
+            ) : null}
+            <Text style={styles.bigDayText}>DAY {cycleDay}</Text>
+            <Text style={styles.ofCycle}>of cycle</Text>
+            </View>
+            <Text style={styles.monthFooter}>
+              {footerDate
+                .toLocaleString("default", { month: "long" })
+                .toUpperCase()}
+            </Text>
+            {(phaseKey === "menstrual" || daysLate > 0) ? (
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={() => {
+                  try {
+                    requestLogModal?.();
+                  } catch {
+                    // ignore
+                  }
+                }}
+                style={styles.logPeriodButton}
+              >
+                <Text style={styles.logPeriodText}>Log period</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
       </View>
     </View>
   );
@@ -716,6 +776,16 @@ const styles = StyleSheet.create({
     color: "#E1F2FF",
     letterSpacing: 1,
   },
+  delayed: {
+    fontFamily: "georgia",
+    fontSize: 10,
+    color: "rgb(255, 255, 255)",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+    overflow: "hidden",
+    letterSpacing: 0.4,
+  },
   divider: {
     width: width * 0.6,
     height: 1,
@@ -743,6 +813,23 @@ const styles = StyleSheet.create({
     height: WRAPPER_SIZE,
     alignItems: "center",
     justifyContent: "center",
+  },
+  backToTodayButton: {
+    position: "absolute",
+    right: 16,
+    top: 16,
+    zIndex: 250,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 14,
+  },
+  backToTodayText: {
+    color: "#E1F2FF",
+    fontSize: 12,
+    fontFamily: "monospace",
   },
   dialIndicator: {
     position: "absolute",
@@ -802,8 +889,13 @@ const styles = StyleSheet.create({
     fontFamily: "Georgia",
   },
   bottomInfo: {
+    position: "relative",
     alignItems: "center",
-    marginBottom: 30,
+    marginBottom: 18,
+  },
+  bottomPrimaryCluster: {
+    alignItems: "center",
+    transform: [{ translateY: -20 }],
   },
   bigDayText: {
     fontFamily: "Georgia",
@@ -822,8 +914,39 @@ const styles = StyleSheet.create({
     fontFamily: "monospace",
     fontSize: 12,
     color: "white",
-    marginTop: 40,
+    marginTop: 16,
     letterSpacing: 3,
     opacity: 0.7,
+  },
+  smallTodayButton: {
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 14,
+    marginBottom: 2,
+  },
+  smallTodayText: {
+    color: "#E1F2FF",
+    fontSize: 11,
+    fontFamily: "monospace",
+  },
+  logPeriodButton: {
+    position: "absolute",
+    bottom: -24,
+    alignSelf: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 999,
+    borderWidth: 0.4,
+    borderColor: "rgba(255,255,255,0.22)",
+    backgroundColor: "rgba(255,255,255,0.06)",
+  },
+  logPeriodText: {
+    color: "#FFFFFF",
+    fontSize: 10,
+    letterSpacing: 0.5,
+    fontFamily: "monospace",
   },
 });

@@ -1,13 +1,13 @@
+import { supabaseClient } from "@/lib/supabase";
 import React, {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
+    createContext,
+    useCallback,
+    useContext,
+    useEffect,
+    useMemo,
+    useState,
 } from "react";
 import { loadCycleSnapshot, saveCycleSnapshot } from "../lib/cycle-sync";
-import { supabaseClient } from "@/lib/supabase";
 
 export type LogEntry = {
   moods: string[];
@@ -15,6 +15,7 @@ export type LogEntry = {
 };
 
 export type CycleProfile = {
+  nickname: string;
   birthday: string;
   cycleRegularity: string | null;
   healthHistory: string[];
@@ -52,6 +53,14 @@ type CycleDataContextValue = {
     year: number,
     month: number,
   ) => { label: string; count: number }[];
+  selectedLogDate: Date | null;
+  setSelectedLogDate: (d: Date | null) => void;
+  getSelectedLogDate: () => Date | null;
+  logModalRequestCount: number;
+  requestLogModal: () => void;
+  predictedStarts: string[];
+  missedPredictedStarts: Record<string, true>;
+  isDateInMissedPredictedWindow: (date: Date) => boolean;
   resetStore: () => void;
   fetchRemoteCycles: () => Promise<void>;
   logNewCycle: (
@@ -110,7 +119,59 @@ const defaultCycleLength = 28;
 const defaultPeriodLength = 5;
 const STORAGE_KEY = "@abyssal_cycle_data";
 
+const isValidCycleInterval = (days: number) => days >= 21 && days <= 35;
+
+const average = (values: number[]) =>
+  Math.round(values.reduce((sum, value) => sum + value, 0) / values.length);
+
+const calculateCycleLength = (starts: Date[], baseLength: number) => {
+  if (starts.length < 2) return baseLength;
+
+  const intervals = starts
+    .slice(1)
+    .map((date, idx) =>
+      Math.round(
+        (date.getTime() - starts[idx].getTime()) / (1000 * 60 * 60 * 24),
+      ),
+    )
+    .filter((days) => days > 0);
+
+  const validIntervals = intervals.filter(isValidCycleInterval);
+  if (!validIntervals.length) return baseLength;
+
+  if (starts.length === 2) {
+    return average([baseLength, validIntervals[0]]);
+  }
+
+  if (starts.length === 3) {
+    return average([
+      baseLength,
+      ...validIntervals.slice(0, 2),
+    ]);
+  }
+
+  const recent = validIntervals.slice(-6);
+  return recent.length ? average(recent) : baseLength;
+};
+
+const calculateStdDev = (values: number[], mean: number) => {
+  if (!values.length) return 0;
+  const variance = values.reduce((sum, value) => sum + (value - mean) ** 2, 0) / values.length;
+  return Math.sqrt(variance);
+};
+
+const getIntervalsFromStarts = (starts: Date[]) =>
+  starts
+    .slice(1)
+    .map((date, idx) =>
+      Math.round(
+        (date.getTime() - starts[idx].getTime()) / (1000 * 60 * 60 * 24),
+      ),
+    )
+    .filter((days) => days > 0);
+
 const defaultProfile: CycleProfile = {
+  nickname: "",
   birthday: "",
   cycleRegularity: null,
   healthHistory: [],
@@ -133,6 +194,10 @@ export function CycleDataProvider({ children }: { children: React.ReactNode }) {
   const [hydrated, setHydrated] = useState(false);
   const [daysLate, setDaysLate] = useState<number>(0);
   const [predictionStatus, setPredictionStatus] = useState<string>("");
+  const [predictedStarts, setPredictedStarts] = useState<string[]>([]);
+  const [missedPredictedStarts, setMissedPredictedStarts] = useState<Record<string, true>>({});
+  const [selectedLogDate, setSelectedLogDateState] = useState<Date | null>(null);
+  const [logModalRequestCount, setLogModalRequestCount] = useState(0);
 
   // Reset everything to defaults (clears in-memory and persisted snapshot)
   const resetStore = useCallback(() => {
@@ -146,6 +211,26 @@ export function CycleDataProvider({ children }: { children: React.ReactNode }) {
     } catch {
       // ignore
     }
+  }, []);
+
+  const setSelectedLogDate = useCallback((d: Date | null) => {
+    if (!d) {
+      setSelectedLogDateState((prev) => (prev === null ? prev : null));
+      return;
+    }
+    const copy = new Date(d);
+    copy.setHours(0, 0, 0, 0);
+    setSelectedLogDateState((prev) => {
+      if (prev && formatDateKey(prev) === formatDateKey(copy)) {
+        return prev;
+      }
+      return copy;
+    });
+  }, []);
+
+  const getSelectedLogDate = useCallback(() => (selectedLogDate ? new Date(selectedLogDate) : null), [selectedLogDate]);
+  const requestLogModal = useCallback(() => {
+    setLogModalRequestCount((count) => count + 1);
   }, []);
 
   async function logNewCycle(
@@ -330,26 +415,18 @@ export function CycleDataProvider({ children }: { children: React.ReactNode }) {
     const runs = buildPeriodRuns(periodKeys);
     const starts = runs.map((run) => parseDateKey(run[0]));
 
-    // Only generate predictions when we have >= 2 starts from actual data
-    if (starts.length < 2) {
+    if (!starts.length) {
       setPredictedDates({});
+      setPredictedStarts([]);
       return;
     }
 
-    // Compute average cycle length from actual starts
-    const diffs = starts
-      .slice(1)
-      .map((date, idx) =>
-        Math.round(
-          (date.getTime() - starts[idx].getTime()) / (1000 * 60 * 60 * 24),
-        ),
-      )
-      .filter((diff) => diff > 0);
+    const baseCycleLength = profile.cycleLength || defaultCycleLength;
+    const diffs = getIntervalsFromStarts(starts);
+    const validDiffs = diffs.filter(isValidCycleInterval);
+    const targetCycleLength = calculateCycleLength(starts, baseCycleLength);
 
-    const avgCycleLength = diffs.length
-      ? Math.round(diffs.reduce((sum, val) => sum + val, 0) / diffs.length)
-      : defaultCycleLength;
-
+    // compute avg period length from runs
     let avgPeriodLength = defaultPeriodLength;
     if (runs.length) {
       avgPeriodLength = Math.round(
@@ -357,29 +434,148 @@ export function CycleDataProvider({ children }: { children: React.ReactNode }) {
       );
     }
 
+    const stdDev = calculateStdDev(
+      validDiffs.slice(-6),
+      validDiffs.length ? average(validDiffs.slice(-6)) : targetCycleLength,
+    );
+    let isIrregular = stdDev >= 7;
+    const isModeratelyIrregular = stdDev > 3 && stdDev < 7;
+
+    const selfReportedIrregular =
+      !!profile.cycleRegularity &&
+      (profile.cycleRegularity.toLowerCase() === "irregular" ||
+        profile.cycleRegularity.toLowerCase() === "unsure");
+    if (selfReportedIrregular) isIrregular = true;
+
     const lastStart = starts[starts.length - 1];
     const nextPredictions: Record<string, true> = {};
+    const nextPredictedStarts: string[] = [];
     const monthsAhead = 18;
     let cursor = new Date(lastStart);
+
+    // window size when irregular/self-reported unsure -> wider expected window
+    const windowSize = isIrregular ? 7 : isModeratelyIrregular || selfReportedIrregular ? 5 : 1;
 
     for (let i = 0; i < monthsAhead; i += 1) {
       cursor = new Date(
         cursor.getFullYear(),
         cursor.getMonth(),
-        cursor.getDate() + avgCycleLength,
+        cursor.getDate() + targetCycleLength,
       );
-      for (let day = 0; day < avgPeriodLength; day += 1) {
-        const predicted = new Date(
-          cursor.getFullYear(),
-          cursor.getMonth(),
-          cursor.getDate() + day,
-        );
-        nextPredictions[formatDateKey(predicted)] = true;
+
+      // record this predicted start
+      nextPredictedStarts.push(formatDateKey(cursor));
+
+      if (windowSize <= 1) {
+        for (let day = 0; day < avgPeriodLength; day += 1) {
+          const predicted = new Date(
+            cursor.getFullYear(),
+            cursor.getMonth(),
+            cursor.getDate() + day,
+          );
+          nextPredictions[formatDateKey(predicted)] = true;
+        }
+      } else {
+        const half = Math.floor((windowSize - 1) / 2);
+        for (let offset = -half; offset <= half; offset += 1) {
+          for (let day = 0; day < avgPeriodLength; day += 1) {
+            const predicted = new Date(
+              cursor.getFullYear(),
+              cursor.getMonth(),
+              cursor.getDate() + offset + day,
+            );
+            nextPredictions[formatDateKey(predicted)] = true;
+          }
+        }
       }
     }
-
     setPredictedDates(nextPredictions);
-  }, [periodDates]);
+    setPredictedStarts(nextPredictedStarts);
+  }, [periodDates, profile.cycleLength, profile.cycleRegularity, profile.medications]);
+
+  // compute missed predicted starts: predicted starts that have passed without any logged period days
+  useEffect(() => {
+    if (!predictedStarts.length) {
+      setMissedPredictedStarts({});
+      return;
+    }
+
+    const runs = buildPeriodRuns(Object.keys(periodDates));
+    let avgPeriodLength = defaultPeriodLength;
+    if (runs.length) {
+      avgPeriodLength = Math.round(
+        runs.reduce((sum, run) => sum + run.length, 0) / runs.length,
+      );
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const missed: Record<string, true> = {};
+
+    predictedStarts.forEach((psKey) => {
+      const psDate = parseDateKey(psKey);
+      // only consider past predicted starts
+      if (psDate.getTime() > today.getTime()) return;
+
+      // check if any logged period day intersects the predicted window
+      let found = false;
+      for (let d = 0; d < avgPeriodLength; d += 1) {
+        const key = formatDateKey(new Date(psDate.getFullYear(), psDate.getMonth(), psDate.getDate() + d));
+        if (periodDates[key]) {
+          found = true;
+          break;
+        }
+      }
+      if (!found) {
+        missed[psKey] = true;
+      }
+    });
+
+    setMissedPredictedStarts(missed);
+  }, [predictedStarts, periodDates]);
+
+  const isDateInMissedPredictedWindow = useCallback(
+    (date: Date) => {
+      const runs = buildPeriodRuns(Object.keys(periodDates));
+      let avgPeriodLength = defaultPeriodLength;
+      if (runs.length) {
+        avgPeriodLength = Math.round(
+          runs.reduce((sum, run) => sum + run.length, 0) / runs.length,
+        );
+      }
+      const key = formatDateKey(date);
+      for (const psKey of Object.keys(missedPredictedStarts)) {
+        const psDate = parseDateKey(psKey);
+        for (let d = 0; d < avgPeriodLength; d += 1) {
+          const k = formatDateKey(new Date(psDate.getFullYear(), psDate.getMonth(), psDate.getDate() + d));
+          if (k === key) return true;
+        }
+      }
+      return false;
+    },
+    [missedPredictedStarts, periodDates],
+  );
+
+  // Compute ovulation and fertile window for a predicted period start date.
+  // Returns null if ovulation is suppressed (e.g., hormonal birth control).
+  const getFertileWindow = useCallback(
+    (predictedStart: Date) => {
+      const meds = profile.medications || [];
+      const hasHormonal = meds.some((m) =>
+        m.toLowerCase().includes("birth") || m.toLowerCase().includes("horm"),
+      );
+      if (hasHormonal) return null;
+
+      const ovulation = new Date(predictedStart);
+      ovulation.setDate(ovulation.getDate() - 14);
+      const start = new Date(ovulation);
+      start.setDate(start.getDate() - 5);
+      const end = new Date(ovulation);
+      end.setDate(end.getDate() + 1);
+      return { ovulation, fertileStart: start, fertileEnd: end };
+    },
+    [profile.medications],
+  );
 
   const logMoodSymptoms = useCallback(
     (date: Date, moods: string[], symptoms: string[]) => {
@@ -418,26 +614,13 @@ export function CycleDataProvider({ children }: { children: React.ReactNode }) {
     const periodKeys = Object.keys(periodDates);
     const runs = buildPeriodRuns(periodKeys);
     const starts = runs.map((run) => parseDateKey(run[0]));
-
-    let avgCycleLength = defaultCycleLength;
-    if (starts.length >= 2) {
-      const diffs = starts
-        .slice(1)
-        .map((date, idx) =>
-          Math.round(
-            (date.getTime() - starts[idx].getTime()) / (1000 * 60 * 60 * 24),
-          ),
-        )
-        .filter((diff) => diff > 0);
-      if (diffs.length) {
-        avgCycleLength = Math.round(
-          diffs.reduce((sum, val) => sum + val, 0) / diffs.length,
-        );
-      }
-    }
-
-    const cycleLength =
-      starts.length >= 2 ? avgCycleLength : profile.cycleLength;
+    const baseCycleLength = profile.cycleLength || defaultCycleLength;
+    const diffs = getIntervalsFromStarts(starts);
+    const validDiffs = diffs.filter(isValidCycleInterval);
+    const avgCycleLength = validDiffs.length
+      ? average(validDiffs.slice(-6))
+      : baseCycleLength;
+    const cycleLength = calculateCycleLength(starts, baseCycleLength);
 
     let avgPeriodLength = defaultPeriodLength;
     if (runs.length) {
@@ -479,6 +662,9 @@ export function CycleDataProvider({ children }: { children: React.ReactNode }) {
       logMoodSymptoms,
       updateProfile,
       setCycleLength,
+      predictedStarts,
+      missedPredictedStarts,
+      isDateInMissedPredictedWindow,
       getPeriodDaysForMonth,
       getPredictedDaysForMonth,
       getLogsForDate,
@@ -486,10 +672,16 @@ export function CycleDataProvider({ children }: { children: React.ReactNode }) {
       getCycleStats,
       getSymptomFrequencyForMonth,
       resetStore,
+      getFertileWindow,
       fetchRemoteCycles,
       logNewCycle,
       daysLate,
       predictionStatus,
+      selectedLogDate,
+      setSelectedLogDate,
+      getSelectedLogDate,
+      logModalRequestCount,
+      requestLogModal,
     }),
     [
       periodDates,
@@ -514,6 +706,12 @@ export function CycleDataProvider({ children }: { children: React.ReactNode }) {
       logNewCycle,
       daysLate,
       predictionStatus,
+      selectedLogDate,
+      setSelectedLogDate,
+      getSelectedLogDate,
+      logModalRequestCount,
+      requestLogModal,
+      getFertileWindow,
     ],
   );
 
