@@ -1,20 +1,21 @@
 import WaveBackground from "@/components/WaveBackground";
 import { OceanColors } from "@/constants/theme";
+import { supabaseClient } from '@/lib/supabase';
 import { MaterialIcons } from "@expo/vector-icons";
 import { useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import {
-  Dimensions,
-  Image,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    Dimensions,
+    Image,
+    KeyboardAvoidingView,
+    Modal,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 
 export default function LoginScreen() {
@@ -47,14 +48,24 @@ export default function LoginScreen() {
   };
 
   const handleLogin = async () => {
+    if (!email.trim() || !password) {
+      alert('Please enter both email and password');
+      return;
+    }
     setLoading(true);
     try {
-      // TODO: Implement actual login logic
-      console.log('Login:', { email, password });
-      // After successful login, navigate to main app
+      const { error } = await supabaseClient.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
+      if (error) {
+        alert(`Login failed: ${error.message}`);
+        return;
+      }
       router.replace('/dashboard');
-    } catch (error) {
-      console.error('Login error:', error);
+    } catch (err) {
+      console.error('Login error:', err);
+      alert('Login failed. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -135,9 +146,9 @@ export default function LoginScreen() {
           {/* Login Button */}
           <TouchableOpacity
             activeOpacity={1}
-            style={[styles.loginButton, loading && styles.buttonDisabled]}
+            style={[styles.loginButton, (loading || !email.trim() || !password) && styles.buttonDisabled]}
             onPress={handleLogin}
-            disabled={loading}
+            disabled={loading || !email.trim() || !password}
           >
             <Text style={styles.loginButtonText}>{loading ? 'Logging In...' : 'Log In'}</Text>
           </TouchableOpacity>

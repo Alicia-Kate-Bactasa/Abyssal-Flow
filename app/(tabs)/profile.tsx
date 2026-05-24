@@ -1,15 +1,16 @@
+import { useUser } from "@/hooks/use-user-store";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import React, { useMemo, useState } from "react";
 import {
-  Dimensions,
-  Modal,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
+    Dimensions,
+    Modal,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -21,13 +22,13 @@ const TinySpeck = ({ top, left, opacity }: { top: number; left: number; opacity:
 
 const BackgroundSparkles = () => {
   const specks = useMemo(
-      () =>
-        Array.from({ length: 60 }, (_, idx) => ({
-          id: idx,
-          top: Math.random() * height,
-          left: Math.random() * width,
-          opacity: 0.25 + Math.random() * 0.45,
-        })),
+    () =>
+      Array.from({ length: 60 }, (_, idx) => ({
+        id: idx,
+        top: Math.random() * height,
+        left: Math.random() * width,
+        opacity: 0.25 + Math.random() * 0.45,
+      })),
     [],
   );
 
@@ -48,6 +49,7 @@ const BackgroundSparkles = () => {
 export default function ProfileScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { user } = useUser();
   const [description, setDescription] = useState("");
   const [logoutVisible, setLogoutVisible] = useState(false);
 
@@ -73,7 +75,7 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        <Text style={styles.name}>Ishie Boo</Text>
+        <Text style={styles.name}>{user.nickname || "Profile"}</Text>
         <Text style={styles.sectionLabel}>Description:</Text>
         <TextInput
           style={styles.descriptionBox}

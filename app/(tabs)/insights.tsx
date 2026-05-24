@@ -50,6 +50,25 @@ const formatMonthLabel = (year: number, month: number) =>
     year: "numeric",
   });
 
+const DAY_MS = 1000 * 60 * 60 * 24;
+
+const getCycleDayFromDates = (anchor: Date, date: Date, cycleLength: number) => {
+  const anchorUtc = Date.UTC(anchor.getFullYear(), anchor.getMonth(), anchor.getDate());
+  const dateUtc = Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
+  return (Math.max(0, Math.floor((dateUtc - anchorUtc) / DAY_MS)) % cycleLength) + 1;
+};
+
+const getPhaseKey = (cycleDay: number, cycleLength: number) => {
+  const menstrualEnd = Math.max(4, Math.round(cycleLength * 0.18));
+  const follicularEnd = Math.max(menstrualEnd + 1, Math.round(cycleLength * 0.46));
+  const ovulationEnd = Math.max(follicularEnd + 1, Math.round(cycleLength * 0.61));
+
+  if (cycleDay <= menstrualEnd) return "menstrual";
+  if (cycleDay <= follicularEnd) return "follicular";
+  if (cycleDay <= ovulationEnd) return "ovulation";
+  return "luteal";
+};
+
 const getContextMessage = (
   moods: string[],
   symptoms: string[],
@@ -59,6 +78,7 @@ const getContextMessage = (
     typicalFlow: string | null;
     healthHistory: string[];
     medications: string[];
+    comfortFood: string[];
     symptoms: string[];
     moods: string[];
   },
@@ -69,7 +89,11 @@ const getContextMessage = (
   if (moods.includes("Anxious")) return "The sea is deep. Breathe deeply to calm the inner waters.";
   if (profile.cycleRegularity === "irregular") return "Your cycle may shift more often, so every log sharpens the forecast.";
   if (profile.typicalFlow === "heavy") return "Your heavier flow notes will help shape clearer tide predictions.";
-  if (profile.medicalCheckups === "no") return "Keep logging your tides so the forecast can stay accurate between checkups.";
+  if (profile.medicalCheckups === "never") return "Keep logging your tides so the forecast can stay accurate between checkups.";
+  if (profile.healthHistory.includes("pcos")) return "Your PCOS history can help the forecast stay tuned to longer cycle shifts.";
+  if (profile.healthHistory.includes("endometriosis")) return "Your endometriosis history helps keep the tide guidance grounded in real patterns.";
+  if (profile.medications.includes("birth_control")) return "Your medication profile can help explain cycle changes and soften the forecast gaps.";
+  if (profile.comfortFood.includes("sweet")) return "Sweet cravings are another signal your cycle pattern can learn from.";
   if (profile.symptoms.includes("cramps") || profile.symptoms.includes("bloating")) return "Your saved symptom profile can help tune future tide guidance.";
   if (profile.moods.includes("anxiety") || profile.moods.includes("lowmood")) return "Your mood profile is tracked to help surface calmer guidance.";
   return "Chart your path across the cosmic ocean of cycle insights.";
@@ -141,6 +165,7 @@ export default function InsightsScreen() {
     periodDates,
     predictedDates,
     getCycleStats,
+    getLatestPeriodStart,
     getLogsForDate,
     getSymptomFrequencyForMonth,
     profile,
@@ -160,6 +185,8 @@ export default function InsightsScreen() {
     selectedDate.getMonth(),
   ).slice(0, 3);
 
+  const latestPeriodStart = getLatestPeriodStart();
+
   const nextPredictedDate = useMemo(() => {
     const keys = Object.keys(predictedDates)
       .sort((a, b) => parseDateKey(a).getTime() - parseDateKey(b).getTime())
@@ -167,15 +194,18 @@ export default function InsightsScreen() {
     return keys.length ? parseDateKey(keys[0]) : null;
   }, [predictedDates]);
 
-  // Phase Estimator
   const currentPhase = useMemo(() => {
-    if (!nextPredictedDate) return "Unknown Depth";
-    const daysUntil = Math.floor((nextPredictedDate.getTime() - new Date().getTime()) / (1000 * 3600 * 24));
-    if (daysUntil <= 5) return "Ebbing Tide (Luteal)";
-    if (daysUntil <= 14) return "Crest (Ovulation)";
-    if (daysUntil <= 20) return "Rising Tide (Follicular)";
-    return "Abyssal Flow (Menstruation)";
-  }, [nextPredictedDate]);
+    if (!latestPeriodStart) return "Unknown Depth";
+
+    const cycleLength = cycleStats.cycleLength;
+    const cycleDay = getCycleDayFromDates(latestPeriodStart, new Date(), cycleLength);
+    const phaseKey = getPhaseKey(cycleDay, cycleLength);
+
+    if (phaseKey === "menstrual") return "Abyssal Flow (Menstruation)";
+    if (phaseKey === "follicular") return "Rising Tide (Follicular)";
+    if (phaseKey === "ovulation") return "Crest (Ovulation)";
+    return "Ebbing Tide (Luteal)";
+  }, [cycleStats.cycleLength, latestPeriodStart]);
 
   const phasePredictionText = nextPredictedDate
     ? `Currents shift around ${nextPredictedDate.toLocaleDateString("default", {
@@ -223,6 +253,10 @@ export default function InsightsScreen() {
         {weeks.map((week, index) => (
           <View key={index} style={styles.weekRow}>
             {week.map((cell, cellIndex) => {
+              if (!cell.isCurrentMonth) {
+                return <View key={`${index}-${cellIndex}`} style={styles.dayChip} />;
+              }
+
               const targetDate = new Date(year, month + cell.monthOffset, cell.day);
               const dateKey = formatDateKey(targetDate);
               const isPeriod = !!periodDates[dateKey];
@@ -246,7 +280,6 @@ export default function InsightsScreen() {
                   <Text
                     style={[
                       styles.dayText,
-                      !cell.isCurrentMonth && styles.outOfMonthText,
                       isPredicted && styles.dayTextPredicted,
                       isPeriod && styles.dayTextPeriod,
                     ]}

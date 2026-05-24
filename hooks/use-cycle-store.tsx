@@ -1,5 +1,5 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { loadCycleSnapshot, saveCycleSnapshot } from "../lib/cycle-sync";
 
 export type LogEntry = {
   moods: string[];
@@ -109,18 +109,10 @@ export function CycleDataProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     (async () => {
       try {
-        const raw = await AsyncStorage.getItem(STORAGE_KEY);
-        if (!raw) return;
-        const parsed = JSON.parse(raw) as Partial<{
-          periodDates: Record<string, true>;
-          predictedDates: Record<string, true>;
-          logs: Record<string, LogEntry>;
-          profile: Partial<CycleProfile>;
-        }>;
-        if (parsed.periodDates) setPeriodDates(parsed.periodDates);
-        if (parsed.predictedDates) setPredictedDates(parsed.predictedDates);
-        if (parsed.logs) setLogs(parsed.logs);
-        if (parsed.profile) setProfile((prev) => ({ ...prev, ...parsed.profile }));
+        const snapshot = await loadCycleSnapshot();
+        if (snapshot.periodDates) setPeriodDates(snapshot.periodDates);
+        if (snapshot.logs) setLogs(snapshot.logs);
+        if (snapshot.profile) setProfile((prev) => ({ ...prev, ...snapshot.profile }));
       } catch {
         // ignore storage errors and fall back to defaults
       } finally {
@@ -133,15 +125,12 @@ export function CycleDataProvider({ children }: { children: React.ReactNode }) {
     if (!hydrated) return;
     (async () => {
       try {
-        await AsyncStorage.setItem(
-          STORAGE_KEY,
-          JSON.stringify({ periodDates, predictedDates, logs, profile }),
-        );
+        await saveCycleSnapshot(periodDates, logs);
       } catch {
         // ignore storage errors
       }
     })();
-  }, [hydrated, periodDates, predictedDates, logs, profile]);
+  }, [hydrated, periodDates, logs]);
 
   const togglePeriodDate = useCallback((date: Date) => {
     const key = formatDateKey(date);

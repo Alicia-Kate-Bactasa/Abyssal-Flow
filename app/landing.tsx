@@ -1,10 +1,10 @@
 import WaveBackground from "@/components/WaveBackground";
 import { formatDateKey, useCycleData } from "@/hooks/use-cycle-store";
+import { submitOnboarding } from "@/hooks/use-onboarding-submit";
 import { useUser } from "@/hooks/use-user-store";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import { submitOnboarding } from "@/hooks/use-onboarding-submit";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
@@ -66,9 +66,9 @@ const CONDITIONS = [
   { id: "none", label: "None of the above" },
 ];
 const CHECKUP_OPTIONS = [
-  { id: "yes", label: "Yes, regularly" },
-  { id: "sometimes", label: "Only when there is an issue" },
-  { id: "no", label: "No, not recently" },
+  { id: "regular", label: "Yes, regularly" },
+  { id: "occasional", label: "Only when there is an issue" },
+  { id: "never", label: "No, not recently" },
 ];
 const MEDICATIONS = [
   { id: "birth_control", label: "Birth Control (Pill, Patch, Ring)" },
@@ -307,6 +307,7 @@ function ProgressBar({ step }: { step: number }) {
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function LandingScreen() {
   const router = useRouter();
+  const { setNickname: setUserNickname } = useUser();
   const [step, setStep] = useState(1);
   const {
     periodDates,
@@ -315,7 +316,6 @@ export default function LandingScreen() {
     setCycleLength,
     updateProfile,
   } = useCycleData();
-  const { setNickname: saveNickname } = useUser();
 
   // Collected data
   const [nickname, setNickname] = useState("");
@@ -348,10 +348,6 @@ export default function LandingScreen() {
   useEffect(() => {
     anim.run();
   }, [anim, step]);
-
-  useEffect(() => {
-    saveNickname(nickname);
-  }, [nickname, saveNickname]);
 
   useEffect(() => {
     updateProfile({
@@ -526,18 +522,16 @@ export default function LandingScreen() {
         periodDates: periodDatesArray,
         cycleRegularity:
           (cycleRegularity as "regular" | "irregular" | "unsure") || "unsure",
-        cycleLength: profile.cycleLength || 28,
+        cycleLength: profile.cycleLength,
         typicalFlow:
           (typicalFlow as "light" | "medium" | "heavy" | "very_heavy") ||
           "medium",
         medicalCheckups:
-          medicalCheckups === "yes"
-            ? "regular"
-            : medicalCheckups === "sometimes"
-              ? "occasional"
-              : medicalCheckups === "no"
-                ? "never"
-                : "unsure",
+          (medicalCheckups as
+            | "regular"
+            | "occasional"
+            | "never"
+            | "unsure") || "unsure",
         healthHistoryIds: healthHistory
           .map((id) => HEALTH_MAP[id] || 0)
           .filter(Boolean),
@@ -550,6 +544,8 @@ export default function LandingScreen() {
           .map((id) => FOOD_MAP[id] || 0)
           .filter(Boolean),
       };
+
+      setUserNickname(payload.nickname);
 
       await submitOnboarding(payload as any);
       router.replace("/dashboard");
@@ -638,7 +634,10 @@ export default function LandingScreen() {
               placeholder="Enter Nickname..."
               placeholderTextColor="rgba(255, 252, 252, 0.66)"
               value={nickname}
-              onChangeText={setNickname}
+              onChangeText={(value) => {
+                setNickname(value);
+                setUserNickname(value.trim());
+              }}
               autoCorrect={false}
               autoCapitalize="none"
             />

@@ -4,13 +4,13 @@ import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-    Animated,
-    Dimensions,
-    Easing,
-    PanResponder,
-    StyleSheet,
-    Text,
-    View,
+  Animated,
+  Dimensions,
+  Easing,
+  PanResponder,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
 import Svg, { Path } from "react-native-svg";
 
@@ -637,7 +637,7 @@ export default function Dashboard() {
 
       <View style={styles.contentOverlay} pointerEvents="box-none">
         <View style={styles.header} pointerEvents="box-none">
-          <Text style={styles.greeting}>Hello, {user.nickname.trim() || "ishie"}!</Text>
+          <Text style={styles.greeting}>Hello, {(user.nickname && user.nickname.trim()) ? user.nickname.trim() : "Profile"}!</Text>
           <Text style={styles.subGreeting}>{subGreetingText}</Text>
           <View style={styles.divider} />
           <Text style={styles.phaseTitle}>{phase.title}</Text>

@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { supabaseClient } from "@/lib/supabase";
 import React, { createContext, useContext, useEffect, useState } from "react";
 
 type User = {
@@ -18,25 +18,39 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User>({ nickname: "" });
 
   useEffect(() => {
-    (async () => {
-      try {
-        const raw = await AsyncStorage.getItem(USER_STORAGE_KEY);
-        if (raw) setUser(JSON.parse(raw));
-      } catch (e) {
-        // ignore
-      }
-    })();
-  }, []);
+    let active = true;
 
-  useEffect(() => {
     (async () => {
       try {
-        await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
-      } catch (e) {
+        const { data } = await supabaseClient.auth.getUser();
+        if (!active) return;
+        const nickname =
+          (data.user?.user_metadata?.username as string | undefined) ??
+          (data.user?.user_metadata?.nickname as string | undefined) ??
+          "";
+        if (nickname) setUser({ nickname });
+      } catch {
         // ignore
       }
     })();
-  }, [user]);
+
+    const { data } = supabaseClient.auth.onAuthStateChange((_event, session) => {
+      const nickname =
+        (session?.user?.user_metadata?.username as string | undefined) ??
+        (session?.user?.user_metadata?.nickname as string | undefined) ??
+        "";
+      setUser({ nickname });
+    });
+
+    return () => {
+      active = false;
+      try {
+        data.subscription.unsubscribe();
+      } catch {
+        // ignore
+      }
+    };
+  }, []);
 
   const setNickname = (name: string) => setUser((u) => ({ ...u, nickname: name }));
 

@@ -1,25 +1,27 @@
 import WaveBackground from "@/components/WaveBackground";
 import { OceanColors } from "@/constants/theme";
+import { useUser } from "@/hooks/use-user-store";
 import { supabaseClient } from "@/lib/supabase";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useMemo, useState } from "react";
 import {
-  Dimensions,
-  Image,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  TextInput as RNTextInput,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    Dimensions,
+    Image,
+    KeyboardAvoidingView,
+    Modal,
+    Platform,
+    TextInput as RNTextInput,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
 
 export default function SignupScreen() {
   const router = useRouter();
+  const { setNickname } = useUser();
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -102,6 +104,8 @@ export default function SignupScreen() {
       alert(`Signup failed: ${error.message}`);
       return;
     }
+
+    setNickname(username.trim());
 
     // 3. Success!
     // Since email confirmations are OFF, 'data.session' will instantly exist.

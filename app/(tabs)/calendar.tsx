@@ -3,14 +3,14 @@ import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-    Animated,
-    Dimensions,
-    FlatList,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    View,
+  Animated,
+  Dimensions,
+  FlatList,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -116,6 +116,10 @@ const MonthItem = React.memo(({ year, month, draftDates, predictedDates, onToggl
       {weeks.map((week, index) => (
         <View key={index} style={styles.weekRow}>
           {week.map((cell, cellIndex) => {
+            if (!cell.isCurrentMonth) {
+              return <View key={`${index}-${cellIndex}`} style={styles.dayChip} />;
+            }
+
             const targetDate = new Date(year, month + cell.monthOffset, cell.day);
             const key = formatDateKey(targetDate);
             const isPeriod = !!draftDates[key];
@@ -134,7 +138,6 @@ const MonthItem = React.memo(({ year, month, draftDates, predictedDates, onToggl
                 <Text
                   style={[
                     styles.dayText,
-                    !cell.isCurrentMonth && styles.outOfMonthText,
                     isPredicted && styles.dayTextPredicted,
                     isPeriod && styles.dayTextPeriod,
                   ]}
