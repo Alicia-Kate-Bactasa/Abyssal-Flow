@@ -1,16 +1,20 @@
-import { formatDateKey, parseDateKey, useCycleData } from "@/hooks/use-cycle-store";
+import {
+  formatDateKey,
+  parseDateKey,
+  useCycleData,
+} from "@/hooks/use-cycle-store";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
-    Animated,
-    Dimensions,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Animated,
+  Dimensions,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -25,7 +29,11 @@ const buildWeeks = (year: number, month: number) => {
   const cells = [];
 
   for (let i = firstDay - 1; i >= 0; i--) {
-    cells.push({ day: prevMonthDays - i, isCurrentMonth: false, monthOffset: -1 });
+    cells.push({
+      day: prevMonthDays - i,
+      isCurrentMonth: false,
+      monthOffset: -1,
+    });
   }
 
   for (let i = 1; i <= daysInMonth; i++) {
@@ -52,16 +60,32 @@ const formatMonthLabel = (year: number, month: number) =>
 
 const DAY_MS = 1000 * 60 * 60 * 24;
 
-const getCycleDayFromDates = (anchor: Date, date: Date, cycleLength: number) => {
-  const anchorUtc = Date.UTC(anchor.getFullYear(), anchor.getMonth(), anchor.getDate());
+const getCycleDayFromDates = (
+  anchor: Date,
+  date: Date,
+  cycleLength: number,
+) => {
+  const anchorUtc = Date.UTC(
+    anchor.getFullYear(),
+    anchor.getMonth(),
+    anchor.getDate(),
+  );
   const dateUtc = Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
-  return (Math.max(0, Math.floor((dateUtc - anchorUtc) / DAY_MS)) % cycleLength) + 1;
+  return (
+    (Math.max(0, Math.floor((dateUtc - anchorUtc) / DAY_MS)) % cycleLength) + 1
+  );
 };
 
 const getPhaseKey = (cycleDay: number, cycleLength: number) => {
   const menstrualEnd = Math.max(4, Math.round(cycleLength * 0.18));
-  const follicularEnd = Math.max(menstrualEnd + 1, Math.round(cycleLength * 0.46));
-  const ovulationEnd = Math.max(follicularEnd + 1, Math.round(cycleLength * 0.61));
+  const follicularEnd = Math.max(
+    menstrualEnd + 1,
+    Math.round(cycleLength * 0.46),
+  );
+  const ovulationEnd = Math.max(
+    follicularEnd + 1,
+    Math.round(cycleLength * 0.61),
+  );
 
   if (cycleDay <= menstrualEnd) return "menstrual";
   if (cycleDay <= follicularEnd) return "follicular";
@@ -83,23 +107,47 @@ const getContextMessage = (
     moods: string[];
   },
 ) => {
-  if (symptoms.includes("Bloating")) return "The tide surges. Drink more water to find your center.";
-  if (symptoms.includes("Cramps")) return "Currents are swift. Rest in the ocean's gentle embrace.";
-  if (moods.includes("Energetic")) return "You are a radiant pearl of energy today.";
-  if (moods.includes("Anxious")) return "The sea is deep. Breathe deeply to calm the inner waters.";
-  if (profile.cycleRegularity === "irregular") return "Your cycle may shift more often, so every log sharpens the forecast.";
-  if (profile.typicalFlow === "heavy") return "Your heavier flow notes will help shape clearer tide predictions.";
-  if (profile.medicalCheckups === "never") return "Keep logging your tides so the forecast can stay accurate between checkups.";
-  if (profile.healthHistory.includes("pcos")) return "Your PCOS history can help the forecast stay tuned to longer cycle shifts.";
-  if (profile.healthHistory.includes("endometriosis")) return "Your endometriosis history helps keep the tide guidance grounded in real patterns.";
-  if (profile.medications.includes("birth_control")) return "Your medication profile can help explain cycle changes and soften the forecast gaps.";
-  if (profile.comfortFood.includes("sweet")) return "Sweet cravings are another signal your cycle pattern can learn from.";
-  if (profile.symptoms.includes("cramps") || profile.symptoms.includes("bloating")) return "Your saved symptom profile can help tune future tide guidance.";
-  if (profile.moods.includes("anxiety") || profile.moods.includes("lowmood")) return "Your mood profile is tracked to help surface calmer guidance.";
+  if (symptoms.includes("Bloating"))
+    return "The tide surges. Drink more water to find your center.";
+  if (symptoms.includes("Cramps"))
+    return "Currents are swift. Rest in the ocean's gentle embrace.";
+  if (moods.includes("Energetic"))
+    return "You are a radiant pearl of energy today.";
+  if (moods.includes("Anxious"))
+    return "The sea is deep. Breathe deeply to calm the inner waters.";
+  if (profile.cycleRegularity === "irregular")
+    return "Your cycle may shift more often, so every log sharpens the forecast.";
+  if (profile.typicalFlow === "heavy")
+    return "Your heavier flow notes will help shape clearer tide predictions.";
+  if (profile.medicalCheckups === "never")
+    return "Keep logging your tides so the forecast can stay accurate between checkups.";
+  if (profile.healthHistory.includes("pcos"))
+    return "Your PCOS history can help the forecast stay tuned to longer cycle shifts.";
+  if (profile.healthHistory.includes("endometriosis"))
+    return "Your endometriosis history helps keep the tide guidance grounded in real patterns.";
+  if (profile.medications.includes("birth_control"))
+    return "Your medication profile can help explain cycle changes and soften the forecast gaps.";
+  if (profile.comfortFood.includes("sweet"))
+    return "Sweet cravings are another signal your cycle pattern can learn from.";
+  if (
+    profile.symptoms.includes("cramps") ||
+    profile.symptoms.includes("bloating")
+  )
+    return "Your saved symptom profile can help tune future tide guidance.";
+  if (profile.moods.includes("anxiety") || profile.moods.includes("lowmood"))
+    return "Your mood profile is tracked to help surface calmer guidance.";
   return "Chart your path across the cosmic ocean of cycle insights.";
 };
 
-const TinySpeck = ({ top, left, opacity }: { top: number, left: number, opacity: number }) => {
+const TinySpeck = ({
+  top,
+  left,
+  opacity,
+}: {
+  top: number;
+  left: number;
+  opacity: number;
+}) => {
   return <View style={[styles.speck, { top, left, opacity }]} />;
 };
 
@@ -123,7 +171,13 @@ const BackgroundSparkles = () => {
 };
 
 // Component for the pulsing text shadow on headings
-const PulsingHeading = ({ style, children }: { style: any, children: React.ReactNode }) => {
+const PulsingHeading = ({
+  style,
+  children,
+}: {
+  style: any;
+  children: React.ReactNode;
+}) => {
   const glowAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
@@ -139,7 +193,7 @@ const PulsingHeading = ({ style, children }: { style: any, children: React.React
           duration: 2000,
           useNativeDriver: false,
         }),
-      ])
+      ]),
     ).start();
   }, [glowAnim]);
 
@@ -170,9 +224,18 @@ export default function InsightsScreen() {
     getSymptomFrequencyForMonth,
     profile,
   } = useCycleData();
-  
-  const [selectedDate, setSelectedDate] = useState(new Date());
-  const [currentViewDate, setCurrentViewDate] = useState(new Date());
+
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [currentViewDate, setCurrentViewDate] = useState<Date>(new Date());
+
+  // When period data changes, default the selection to the latest recorded period start
+  useEffect(() => {
+    const latest = getLatestPeriodStart();
+    if (latest) {
+      setSelectedDate(latest);
+      setCurrentViewDate(new Date(latest.getFullYear(), latest.getMonth(), 1));
+    }
+  }, [getLatestPeriodStart, periodDates]);
 
   const cycleStats = getCycleStats();
   const selectedLog = getLogsForDate(selectedDate);
@@ -198,7 +261,11 @@ export default function InsightsScreen() {
     if (!latestPeriodStart) return "Unknown Depth";
 
     const cycleLength = cycleStats.cycleLength;
-    const cycleDay = getCycleDayFromDates(latestPeriodStart, new Date(), cycleLength);
+    const cycleDay = getCycleDayFromDates(
+      latestPeriodStart,
+      new Date(),
+      cycleLength,
+    );
     const phaseKey = getPhaseKey(cycleDay, cycleLength);
 
     if (phaseKey === "menstrual") return "Abyssal Flow (Menstruation)";
@@ -215,11 +282,15 @@ export default function InsightsScreen() {
     : "The cosmic path is unknown.";
 
   const handlePrevMonth = () => {
-    setCurrentViewDate((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
+    setCurrentViewDate(
+      (prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1),
+    );
   };
 
   const handleNextMonth = () => {
-    setCurrentViewDate((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
+    setCurrentViewDate(
+      (prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1),
+    );
   };
 
   const renderCalendar = () => {
@@ -231,13 +302,21 @@ export default function InsightsScreen() {
     return (
       <View style={styles.calendarCard}>
         <View style={styles.monthHeader}>
-          <TouchableOpacity onPress={handlePrevMonth} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          <TouchableOpacity
+            onPress={handlePrevMonth}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
             <Ionicons name="chevron-back" size={18} color="#FFFFFF" />
           </TouchableOpacity>
-          
-          <PulsingHeading style={styles.monthLabelGlow}>{monthLabel}</PulsingHeading>
-          
-          <TouchableOpacity onPress={handleNextMonth} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+
+          <PulsingHeading style={styles.monthLabelGlow}>
+            {monthLabel}
+          </PulsingHeading>
+
+          <TouchableOpacity
+            onPress={handleNextMonth}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
             <Ionicons name="chevron-forward" size={18} color="#FFFFFF" />
           </TouchableOpacity>
         </View>
@@ -249,15 +328,21 @@ export default function InsightsScreen() {
             </Text>
           ))}
         </View>
-        
+
         {weeks.map((week, index) => (
           <View key={index} style={styles.weekRow}>
             {week.map((cell, cellIndex) => {
               if (!cell.isCurrentMonth) {
-                return <View key={`${index}-${cellIndex}`} style={styles.dayChip} />;
+                return (
+                  <View key={`${index}-${cellIndex}`} style={styles.dayChip} />
+                );
               }
 
-              const targetDate = new Date(year, month + cell.monthOffset, cell.day);
+              const targetDate = new Date(
+                year,
+                month + cell.monthOffset,
+                cell.day,
+              );
               const dateKey = formatDateKey(targetDate);
               const isPeriod = !!periodDates[dateKey];
               const isPredicted = !!predictedDates[dateKey] && !isPeriod;
@@ -304,34 +389,46 @@ export default function InsightsScreen() {
           { paddingTop: 20 + insets.top, paddingBottom: 140 + insets.bottom },
         ]}
       >
-        <PulsingHeading style={styles.titleGlow}>Oceanic Summary</PulsingHeading>
+        <PulsingHeading style={styles.titleGlow}>
+          Oceanic Summary
+        </PulsingHeading>
 
         <View style={styles.summaryCard}>
-          <PulsingHeading style={styles.subTitleGlow}>Celestial Currents</PulsingHeading>
+          <PulsingHeading style={styles.subTitleGlow}>
+            Celestial Currents
+          </PulsingHeading>
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Current Tide Phase</Text>
             <Text style={styles.summaryValue}>{currentPhase}</Text>
           </View>
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Oceanic Cycle Length</Text>
-            <Text style={styles.summaryValue}>{cycleStats.avgCycleLength} tides</Text>
+            <Text style={styles.summaryValue}>
+              {cycleStats.avgCycleLength} tides
+            </Text>
           </View>
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Tide Flow Duration</Text>
-            <Text style={styles.summaryValue}>{cycleStats.avgPeriodLength} tides</Text>
+            <Text style={styles.summaryValue}>
+              {cycleStats.avgPeriodLength} tides
+            </Text>
           </View>
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Forecast</Text>
             <Text style={styles.summaryValue}>{phasePredictionText}</Text>
           </View>
         </View>
-        
+
         {renderCalendar()}
 
         {/* Dynamic Daily Summary based on Calendar Selection */}
         <View style={styles.summaryCard}>
           <PulsingHeading style={styles.subTitleGlow}>
-            Daily Dive: {selectedDate.toLocaleDateString("default", { month: "short", day: "numeric" })}
+            Daily Dive:{" "}
+            {selectedDate.toLocaleDateString("default", {
+              month: "short",
+              day: "numeric",
+            })}
           </PulsingHeading>
           {moods.length > 0 || symptoms.length > 0 ? (
             <>
@@ -349,12 +446,16 @@ export default function InsightsScreen() {
               )}
             </>
           ) : (
-            <Text style={styles.emptyStateText}>Waters were undisturbed on this day.</Text>
+            <Text style={styles.emptyStateText}>
+              Waters were undisturbed on this day.
+            </Text>
           )}
         </View>
 
         <View style={styles.frequencyCard}>
-          <PulsingHeading style={styles.sectionHeaderGlow}>Echo Frequency (This Month)</PulsingHeading>
+          <PulsingHeading style={styles.sectionHeaderGlow}>
+            Echo Frequency (This Month)
+          </PulsingHeading>
           {currentMonthFrequency.length ? (
             currentMonthFrequency.map((entry) => (
               <View key={entry.label} style={styles.frequencyRow}>
@@ -370,14 +471,15 @@ export default function InsightsScreen() {
               </View>
             ))
           ) : (
-            <Text style={styles.emptyStateText}>No echoes logged this month.</Text>
+            <Text style={styles.emptyStateText}>
+              No echoes logged this month.
+            </Text>
           )}
         </View>
 
         <View style={styles.insightCardWide}>
           <Text style={styles.insightText}>{contextMessage}</Text>
         </View>
-
       </ScrollView>
     </LinearGradient>
   );
@@ -390,12 +492,12 @@ const styles = StyleSheet.create({
   },
   // Speck styling
   speck: {
-    position: 'absolute',
+    position: "absolute",
     width: 1.5,
     height: 1.5,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     borderRadius: 1,
-    shadowColor: '#FFFFFF',
+    shadowColor: "#FFFFFF",
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 1,
     shadowRadius: 3,
@@ -444,8 +546,18 @@ const styles = StyleSheet.create({
     borderBottomColor: "rgba(255,255,255,0.2)",
     paddingBottom: 4,
   },
-  summaryLabel: { color: "rgba(255,255,255,0.8)", fontSize: 13, fontWeight: "normal" },
-  summaryValue: { color: "#FFFFFF", fontSize: 13, fontWeight: "normal", maxWidth: "50%", textAlign: "right" },
+  summaryLabel: {
+    color: "rgba(255,255,255,0.8)",
+    fontSize: 13,
+    fontWeight: "normal",
+  },
+  summaryValue: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "normal",
+    maxWidth: "50%",
+    textAlign: "right",
+  },
   calendarCard: {
     backgroundColor: "rgba(23,44,92,0.5)",
     borderRadius: 20,
@@ -483,8 +595,9 @@ const styles = StyleSheet.create({
     backgroundColor: "transparent",
   },
   dayChipSelected: {
-    borderWidth: 0,
-    backgroundColor: "#ff4b4b",
+    borderWidth: 1.2,
+    borderColor: "rgba(255,255,255,0.95)",
+    backgroundColor: "transparent",
   },
   dayChipPeriod: {
     borderWidth: 0,
@@ -495,6 +608,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#ff7777",
   },
   dayText: { color: "#FFFFFF", fontSize: 13, fontWeight: "700" },
+  dayTextSelected: { color: "#FFFFFF", fontWeight: "700" },
   outOfMonthText: { color: "rgba(255,255,255,0.3)" },
   dayTextPeriod: { color: "#FFFFFF", fontWeight: "bold" },
   dayTextPredicted: { color: "rgba(255,255,255,0.7)" },

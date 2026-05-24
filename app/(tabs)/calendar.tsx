@@ -1,7 +1,17 @@
-import { formatDateKey, parseDateKey, useCycleData } from "@/hooks/use-cycle-store";
+import {
+  formatDateKey,
+  parseDateKey,
+  useCycleData,
+} from "@/hooks/use-cycle-store";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   Animated,
   Dimensions,
@@ -25,7 +35,11 @@ const buildWeeks = (year: number, month: number) => {
   const cells = [];
 
   for (let i = firstDay - 1; i >= 0; i--) {
-    cells.push({ day: prevMonthDays - i, isCurrentMonth: false, monthOffset: -1 });
+    cells.push({
+      day: prevMonthDays - i,
+      isCurrentMonth: false,
+      monthOffset: -1,
+    });
   }
 
   for (let i = 1; i <= daysInMonth; i++) {
@@ -77,7 +91,15 @@ const buildPeriodRuns = (keys: string[]) => {
   return runs;
 };
 
-const TinySpeck = ({ top, left, opacity }: { top: number, left: number, opacity: number }) => {
+const TinySpeck = ({
+  top,
+  left,
+  opacity,
+}: {
+  top: number;
+  left: number;
+  opacity: number;
+}) => {
   return <View style={[styles.speck, { top, left, opacity }]} />;
 };
 
@@ -108,54 +130,84 @@ type MonthItemProps = {
   onToggleDay: (year: number, month: number, day: number) => void;
 };
 
-const MonthItem = React.memo(({ year, month, draftDates, predictedDates, onToggleDay }: MonthItemProps) => {
-  const weeks = useMemo(() => buildWeeks(year, month), [month, year]);
+const MonthItem = React.memo(
+  ({
+    year,
+    month,
+    draftDates,
+    predictedDates,
+    onToggleDay,
+  }: MonthItemProps) => {
+    const weeks = useMemo(() => buildWeeks(year, month), [month, year]);
 
-  return (
-    <View style={styles.monthGrid}>
-      {weeks.map((week, index) => (
-        <View key={index} style={styles.weekRow}>
-          {week.map((cell, cellIndex) => {
-            if (!cell.isCurrentMonth) {
-              return <View key={`${index}-${cellIndex}`} style={styles.dayChip} />;
-            }
+    return (
+      <View style={styles.monthGrid}>
+        {weeks.map((week, index) => (
+          <View key={index} style={styles.weekRow}>
+            {week.map((cell, cellIndex) => {
+              if (!cell.isCurrentMonth) {
+                return (
+                  <View key={`${index}-${cellIndex}`} style={styles.dayChip} />
+                );
+              }
 
-            const targetDate = new Date(year, month + cell.monthOffset, cell.day);
-            const key = formatDateKey(targetDate);
-            const isPeriod = !!draftDates[key];
-            const isPredicted = predictedDates[key] && !isPeriod;
+              const targetDate = new Date(
+                year,
+                month + cell.monthOffset,
+                cell.day,
+              );
+              const key = formatDateKey(targetDate);
+              const isPeriod = !!draftDates[key];
+              const isPredicted = predictedDates[key] && !isPeriod;
+              const todayKey = formatDateKey(new Date());
+              const isToday = key === todayKey;
 
-            return (
-              <Pressable
-                key={`${index}-${cellIndex}`}
-                style={[
-                  styles.dayChip,
-                  isPredicted && styles.dayChipPredicted,
-                  isPeriod && styles.dayChipPeriod,
-                ]}
-                onPress={() => onToggleDay(targetDate.getFullYear(), targetDate.getMonth(), cell.day)}
-              >
-                <Text
+              return (
+                <Pressable
+                  key={`${index}-${cellIndex}`}
                   style={[
-                    styles.dayText,
-                    isPredicted && styles.dayTextPredicted,
-                    isPeriod && styles.dayTextPeriod,
+                    styles.dayChip,
+                    isPredicted && styles.dayChipPredicted,
+                    isPeriod && styles.dayChipPeriod,
+                    isToday && styles.dayChipSelected,
                   ]}
+                  onPress={() =>
+                    onToggleDay(
+                      targetDate.getFullYear(),
+                      targetDate.getMonth(),
+                      cell.day,
+                    )
+                  }
                 >
-                  {cell.day}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      ))}
-    </View>
-  );
-});
+                  <Text
+                    style={[
+                      styles.dayText,
+                      isPredicted && styles.dayTextPredicted,
+                      isPeriod && styles.dayTextPeriod,
+                      isToday && styles.dayTextSelected,
+                    ]}
+                  >
+                    {cell.day}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        ))}
+      </View>
+    );
+  },
+);
 
 MonthItem.displayName = "MonthItem";
 
-const PulsingHeading = ({ style, children }: { style: any; children: React.ReactNode }) => {
+const PulsingHeading = ({
+  style,
+  children,
+}: {
+  style: any;
+  children: React.ReactNode;
+}) => {
   const glowAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
@@ -171,7 +223,7 @@ const PulsingHeading = ({ style, children }: { style: any; children: React.React
           duration: 2500,
           useNativeDriver: false,
         }),
-      ])
+      ]),
     ).start();
   }, [glowAnim]);
 
@@ -200,9 +252,12 @@ export default function CalendarScreen() {
     recalcPredictions,
     getCycleStats,
   } = useCycleData();
-  
-  const [activeSegment, setActiveSegment] = useState<"calendar" | "pattern">("calendar");
-  const [draftDates, setDraftDates] = useState<Record<string, true>>(periodDates);
+
+  const [activeSegment, setActiveSegment] = useState<"calendar" | "pattern">(
+    "calendar",
+  );
+  const [draftDates, setDraftDates] =
+    useState<Record<string, true>>(periodDates);
   const [currentHeaderDate, setCurrentHeaderDate] = useState(new Date());
 
   const slideAnim = useRef(new Animated.Value(0)).current;
@@ -213,7 +268,7 @@ export default function CalendarScreen() {
 
   const periodKeys = useMemo(() => Object.keys(periodDates), [periodDates]);
   const draftKeys = useMemo(() => Object.keys(draftDates), [draftDates]);
-  
+
   const hasChanges = useMemo(() => {
     if (periodKeys.length !== draftKeys.length) return true;
     const lookup = new Set(periodKeys);
@@ -238,19 +293,22 @@ export default function CalendarScreen() {
     });
   }, [periodKeys]);
 
-  const toggleDraftDate = useCallback((targetYear: number, targetMonth: number, day: number) => {
-    Haptics.selectionAsync();
-    const key = formatDateKey(new Date(targetYear, targetMonth, day));
-    setDraftDates((prev) => {
-      const next = { ...prev };
-      if (next[key]) {
-        delete next[key];
-      } else {
-        next[key] = true;
-      }
-      return next;
-    });
-  }, []);
+  const toggleDraftDate = useCallback(
+    (targetYear: number, targetMonth: number, day: number) => {
+      Haptics.selectionAsync();
+      const key = formatDateKey(new Date(targetYear, targetMonth, day));
+      setDraftDates((prev) => {
+        const next = { ...prev };
+        if (next[key]) {
+          delete next[key];
+        } else {
+          next[key] = true;
+        }
+        return next;
+      });
+    },
+    [],
+  );
 
   const handleSave = () => {
     replacePeriodDates(draftKeys);
@@ -307,9 +365,15 @@ export default function CalendarScreen() {
   return (
     <LinearGradient colors={["#061736", "#1E3A78"]} style={styles.container}>
       <BackgroundSparkles />
-      <View style={[styles.content, { paddingTop: 20 + insets.top, paddingBottom: insets.bottom }]}>
-        
-        <PulsingHeading style={styles.headerTitleGlow}>Cosmic Chart</PulsingHeading>
+      <View
+        style={[
+          styles.content,
+          { paddingTop: 20 + insets.top, paddingBottom: insets.bottom },
+        ]}
+      >
+        <PulsingHeading style={styles.headerTitleGlow}>
+          Cosmic Chart
+        </PulsingHeading>
 
         <View style={styles.segmentedControl}>
           <Animated.View
@@ -323,10 +387,16 @@ export default function CalendarScreen() {
               },
             ]}
           />
-          <Pressable onPress={() => handleTabSwitch("calendar")} style={styles.segment}>
+          <Pressable
+            onPress={() => handleTabSwitch("calendar")}
+            style={styles.segment}
+          >
             <Text style={styles.segmentText}>Tide Tracker</Text>
           </Pressable>
-          <Pressable onPress={() => handleTabSwitch("pattern")} style={styles.segment}>
+          <Pressable
+            onPress={() => handleTabSwitch("pattern")}
+            style={styles.segment}
+          >
             <Text style={styles.segmentText}>Deep Patterns</Text>
           </Pressable>
         </View>
@@ -334,11 +404,15 @@ export default function CalendarScreen() {
         <View style={styles.analyticsCard}>
           <View style={styles.analyticsRow}>
             <Text style={styles.analyticsLabel}>Average cycle length</Text>
-            <Text style={styles.analyticsValue}>{cycleStats.avgCycleLength} tides</Text>
+            <Text style={styles.analyticsValue}>
+              {cycleStats.avgCycleLength} tides
+            </Text>
           </View>
           <View style={styles.analyticsRow}>
             <Text style={styles.analyticsLabel}>Average flow duration</Text>
-            <Text style={styles.analyticsValue}>{cycleStats.avgPeriodLength} tides</Text>
+            <Text style={styles.analyticsValue}>
+              {cycleStats.avgPeriodLength} tides
+            </Text>
           </View>
         </View>
 
@@ -347,7 +421,10 @@ export default function CalendarScreen() {
             <View style={styles.calendarCard}>
               <View style={styles.monthHeader}>
                 <PulsingHeading style={styles.monthLabelGlow}>
-                  {formatMonthLabel(currentHeaderDate.getFullYear(), currentHeaderDate.getMonth())}
+                  {formatMonthLabel(
+                    currentHeaderDate.getFullYear(),
+                    currentHeaderDate.getMonth(),
+                  )}
                 </PulsingHeading>
               </View>
 
@@ -366,7 +443,11 @@ export default function CalendarScreen() {
                   renderItem={renderMonthItem}
                   showsVerticalScrollIndicator={false}
                   initialScrollIndex={12}
-                  getItemLayout={(data, index) => ({ length: 240, offset: 240 * index, index })}
+                  getItemLayout={(data, index) => ({
+                    length: 240,
+                    offset: 240 * index,
+                    index,
+                  })}
                   onViewableItemsChanged={onViewableItemsChanged}
                   viewabilityConfig={viewabilityConfig}
                   removeClippedSubviews
@@ -385,8 +466,13 @@ export default function CalendarScreen() {
             )}
           </View>
         ) : (
-          <ScrollView style={styles.patternWrapper} showsVerticalScrollIndicator={false}>
-            <PulsingHeading style={styles.sectionHeaderGlow}>Echoes of Past Tides</PulsingHeading>
+          <ScrollView
+            style={styles.patternWrapper}
+            showsVerticalScrollIndicator={false}
+          >
+            <PulsingHeading style={styles.sectionHeaderGlow}>
+              Echoes of Past Tides
+            </PulsingHeading>
             {cyclePatternRows.length ? (
               cyclePatternRows.map((row, index) => (
                 <View key={`${row.label}-${index}`} style={styles.cycleRow}>
@@ -396,7 +482,10 @@ export default function CalendarScreen() {
                   </View>
                   <View style={styles.cycleBar}>
                     <LinearGradient
-                      colors={["rgba(255,255,255,0.3)", "rgba(255,255,255,0.05)"]}
+                      colors={[
+                        "rgba(255,255,255,0.3)",
+                        "rgba(255,255,255,0.05)",
+                      ]}
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 0 }}
                       style={[styles.cycleGlowTrack, { flex: 2 }]}
@@ -534,7 +623,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   flatListContainer: {
-    height: 240, 
+    height: 240,
   },
   monthGrid: {
     height: 240,
@@ -553,6 +642,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "transparent",
   },
+  dayChipSelected: {
+    borderWidth: 1.2,
+    borderColor: "rgba(255,255,255,0.9)",
+    backgroundColor: "transparent",
+  },
   dayChipPeriod: {
     backgroundColor: "#ff4b4b",
     borderWidth: 0,
@@ -562,6 +656,7 @@ const styles = StyleSheet.create({
     borderWidth: 0,
   },
   dayText: { color: "#FFFFFF", fontSize: 13, fontWeight: "700" },
+  dayTextSelected: { color: "#FFFFFF", fontWeight: "700" },
   outOfMonthText: { color: "rgba(255,255,255,0.2)" },
   dayTextPeriod: { color: "#FFFFFF", fontWeight: "bold" },
   dayTextPredicted: { color: "rgba(255,255,255,0.7)" },

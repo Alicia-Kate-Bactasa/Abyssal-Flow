@@ -312,6 +312,8 @@ export default function LandingScreen() {
   const {
     periodDates,
     togglePeriodDate,
+    replacePeriodDates,
+    fetchRemoteCycles,
     profile,
     setCycleLength,
     updateProfile,
@@ -527,11 +529,8 @@ export default function LandingScreen() {
           (typicalFlow as "light" | "medium" | "heavy" | "very_heavy") ||
           "medium",
         medicalCheckups:
-          (medicalCheckups as
-            | "regular"
-            | "occasional"
-            | "never"
-            | "unsure") || "unsure",
+          (medicalCheckups as "regular" | "occasional" | "never" | "unsure") ||
+          "unsure",
         healthHistoryIds: healthHistory
           .map((id) => HEALTH_MAP[id] || 0)
           .filter(Boolean),
@@ -548,6 +547,12 @@ export default function LandingScreen() {
       setUserNickname(payload.nickname);
 
       await submitOnboarding(payload as any);
+      // Refresh authoritative cycles from server so predictions use only saved data
+      try {
+        await fetchRemoteCycles();
+      } catch {
+        // ignore
+      }
       router.replace("/dashboard");
     } catch (err) {
       console.error("Onboarding submit failed:", err);
@@ -556,6 +561,15 @@ export default function LandingScreen() {
       setSubmitting(false);
     }
   }
+
+  // Ensure onboarding starts with a clean slate (no leftover dates from previous user)
+  useEffect(() => {
+    try {
+      replacePeriodDates([]);
+    } catch {
+      // ignore
+    }
+  }, [replacePeriodDates]);
 
   // ── Step title & subtitle ───────────────────────────────────────────────────
   const stepMeta: Record<number, { title: string; subtitle?: string }> = {

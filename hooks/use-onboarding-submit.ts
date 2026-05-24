@@ -46,18 +46,55 @@ export async function submitOnboarding(
     .eq("id", uid);
   if (profileErr) throw profileErr;
 
-  // ── 3: Insert period_logs (upsert so re-runs are safe) ───────────────────
+  // ── 3: Insert period_cycles (The Clean Method) ───────────────────
   if (payload.periodDates.length > 0) {
-    const logRows = payload.periodDates.map((date) => ({
-      user_id: uid,
-      log_date: date,
-      source: "manual" as const,
-    }));
+    const DAY_MS = 1000 * 60 * 60 * 24;
 
-    const { error: logErr } = await supabaseClient
-      .from("period_logs")
-      .upsert(logRows, { onConflict: "user_id,log_date" });
-    if (logErr) throw logErr;
+    function groupDatesToCycles(dates: string[]) {
+      const sorted = [...dates].sort();
+      const cycles: { start_date: string; end_date: string }[] = [];
+      if (!sorted.length) return cycles;
+
+      let curStart = sorted[0];
+      let curEnd = sorted[0];
+
+      for (let i = 1; i < sorted.length; i++) {
+        const prev = new Date(curEnd);
+        const next = new Date(sorted[i]);
+        const diff = Math.round((next.getTime() - prev.getTime()) / DAY_MS);
+        if (diff === 1) {
+          curEnd = sorted[i];
+        } else {
+          cycles.push({ start_date: curStart, end_date: curEnd });
+          curStart = sorted[i];
+          curEnd = sorted[i];
+        }
+      }
+      cycles.push({ start_date: curStart, end_date: curEnd });
+      return cycles;
+    }
+
+    const cycles = groupDatesToCycles(payload.periodDates);
+
+    // Delete existing cycles for this user and insert the new set
+    const { error: delErr } = await supabaseClient
+      .from("period_cycles")
+      .delete()
+      .eq("user_id", uid);
+    if (delErr) throw delErr;
+
+    if (cycles.length) {
+      const insertRows = cycles.map((c) => ({
+        user_id: uid,
+        start_date: c.start_date,
+        end_date: c.end_date,
+      }));
+
+      const { error: insErr } = await supabaseClient
+        .from("period_cycles")
+        .insert(insertRows);
+      if (insErr) throw insErr;
+    }
   }
 
   // ── 4: Upsert join-table rows for all multi-selects ──────────────────────
