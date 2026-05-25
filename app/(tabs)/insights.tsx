@@ -1,25 +1,60 @@
 import {
-  formatDateKey,
-  parseDateKey,
-  useCycleData,
+    formatDateKey,
+    parseDateKey,
+    useCycleData,
 } from "@/hooks/use-cycle-store";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Animated,
-  Dimensions,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    Animated,
+    Dimensions,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const { width, height } = Dimensions.get("window");
 const WEEKDAYS = ["S", "M", "T", "W", "T", "F", "S"];
+
+const HEALTH_IDS = {
+  pcos: "1",
+  endometriosis: "2",
+  fibroids: "3",
+  thyroid: "4",
+  none: "5",
+};
+const MEDS_IDS = {
+  birth_control: "1",
+  hormonal: "2",
+  painkillers: "3",
+  none: "4",
+};
+const SYMPTOM_IDS = {
+  cramps: "1",
+  bloating: "2",
+  breast: "3",
+  backpain: "4",
+  acne: "5",
+  headaches: "6",
+};
+const MOOD_IDS = {
+  anxiety: "1",
+  irritability: "2",
+  lowmood: "3",
+  fatigue: "4",
+  nochange: "5",
+};
+const FOOD_IDS = {
+  sweet: "1",
+  salty: "2",
+  savory: "3",
+  spicy: "4",
+};
 
 const buildWeeks = (year: number, month: number) => {
   const firstDay = new Date(year, month, 1).getDay();
@@ -121,20 +156,23 @@ const getContextMessage = (
     return "Your heavier flow notes will help shape clearer tide predictions.";
   if (profile.medicalCheckups === "never")
     return "Keep logging your cycle so the forecast can stay accurate between checkups.";
-  if (profile.healthHistory.includes("pcos"))
+  if (profile.healthHistory.includes(HEALTH_IDS.pcos))
     return "Your PCOS history can help the forecast stay tuned to longer cycle shifts.";
-  if (profile.healthHistory.includes("endometriosis"))
+  if (profile.healthHistory.includes(HEALTH_IDS.endometriosis))
     return "Your endometriosis history helps keep the tide guidance grounded in real patterns.";
-  if (profile.medications.includes("birth_control"))
+  if (profile.medications.includes(MEDS_IDS.birth_control))
     return "Your medication profile can help explain cycle changes and soften the forecast gaps.";
-  if (profile.comfortFood.includes("sweet"))
+  if (profile.comfortFood.includes(FOOD_IDS.sweet))
     return "Sweet cravings are another signal your cycle pattern can learn from.";
   if (
-    profile.symptoms.includes("cramps") ||
-    profile.symptoms.includes("bloating")
+    profile.symptoms.includes(SYMPTOM_IDS.cramps) ||
+    profile.symptoms.includes(SYMPTOM_IDS.bloating)
   )
     return "Your saved symptom profile can help tune future tide guidance.";
-  if (profile.moods.includes("anxiety") || profile.moods.includes("lowmood"))
+  if (
+    profile.moods.includes(MOOD_IDS.anxiety) ||
+    profile.moods.includes(MOOD_IDS.lowmood)
+  )
     return "Your mood profile is tracked to help surface calmer guidance.";
   return "Chart your path across the cosmic ocean of cycle insights.";
 };
