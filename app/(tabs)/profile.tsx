@@ -1,124 +1,170 @@
 import { useUser } from "@/hooks/use-user-store";
+import { supabaseClient } from "@/lib/supabase";
+import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
-    Dimensions,
-    Image,
-    Modal,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  Dimensions,
+  Image,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+  ActivityIndicator,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-
-const { width, height } = Dimensions.get("window");
-
-const TinySpeck = ({ top, left, opacity }: { top: number; left: number; opacity: number }) => {
-  return <View style={[styles.speck, { top, left, opacity }]} />;
-};
-
-const BackgroundSparkles = () => {
-  const specks = useMemo(
-    () =>
-      Array.from({ length: 60 }, (_, idx) => ({
-        id: idx,
-        top: Math.random() * height,
-        left: Math.random() * width,
-        opacity: 0.25 + Math.random() * 0.45,
-      })),
-    [],
-  );
-
-  return (
-    <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
-      {specks.map((speck) => (
-        <TinySpeck
-          key={speck.id}
-          top={speck.top}
-          left={speck.left}
-          opacity={speck.opacity}
-        />
-      ))}
-    </View>
-  );
-};
 
 export default function ProfileScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { user } = useUser();
-  const [description, setDescription] = useState("");
+  const { user, updateUser } = useUser();
+
+  const [nickname, setNickname] = useState(user.nickname || "");
+  const [description, setDescription] = useState(user.description || "");
+  const [email, setEmail] = useState("");
+  const [avatar, setAvatar] = useState(
+    require("../../assets/images/profile.png"),
+  );
+  const [isSaving, setIsSaving] = useState(false);
   const [logoutVisible, setLogoutVisible] = useState(false);
 
+  useEffect(() => {
+    supabaseClient.auth.getUser().then(({ data }) => {
+      if (data.user) setEmail(data.user.email || "");
+    });
+  }, []);
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    await updateUser({ nickname, description });
+    setIsSaving(false);
+    alert("Profile Updated!");
+  };
+
   const handleLogout = () => {
+    setLogoutVisible(false);
     router.replace("/auth/login");
+  };
+
+  const pickImage = async () => {
+    let result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.5,
+    });
+
+    if (!result.canceled) {
+      const uri = result.assets[0].uri;
+      setAvatar({ uri });
+
+      try {
+        // 1. Fetch the image to create a Blob
+        const response = await fetch(uri);
+        const blob = await response.blob();
+
+        const {
+          data: { user: authUser },
+        } = await supabaseClient.auth.getUser();
+        const userId = user.id || authUser?.id;
+
+        if (!userId) throw new Error("No user ID found");
+
+        const fileName = `${userId}/avatar.png`; // Overwrite existing to keep storage clean
+
+        // 2. Upload to Supabase Storage (Bucket name: 'avatars')
+        // NOTE: If the file exists, you may need upsert: true
+        const { error: uploadError } = await supabaseClient.storage
+          .from("avatars")
+          .upload(fileName, blob, { contentType: "image/png", upsert: true });
+
+        if (uploadError) throw uploadError;
+
+        // 3. Get the Public URL
+        const { data: publicUrlData } = supabaseClient.storage
+          .from("avatars")
+          .getPublicUrl(fileName);
+
+        // 4. Save that URL to your 'profiles' table
+        await updateUser({ avatar_url: publicUrlData.publicUrl });
+
+        alert("Profile picture updated!");
+      } catch (err) {
+        console.error("Upload failed:", err);
+        alert("Failed to upload image.");
+      }
+    }
   };
 
   return (
     <LinearGradient colors={["#061736", "#1E3A78"]} style={styles.container}>
-      <BackgroundSparkles />
       <ScrollView
         contentContainerStyle={[
           styles.content,
-          { paddingTop: 24 + insets.top, paddingBottom: 140 + insets.bottom },
+          { paddingTop: 24 + insets.top },
         ]}
+        keyboardShouldPersistTaps="handled" // <--- CRITICAL for buttons in ScrollViews
       >
-        <View style={styles.avatarWrapper}>
-          <Image source={require("../../assets/images/profile.png")} style={styles.avatarImage} />
-        </View>
+        <Pressable onPress={pickImage} style={styles.avatarWrapper}>
+          <Image source={avatar} style={styles.avatarImage} />
+        </Pressable>
 
-        <Text style={styles.name}>{(user.username && user.username.trim()) ? user.username.trim() : (user.nickname || "Profile")}</Text>
-        <Text style={styles.sectionLabel}>Description:</Text>
+        <Text style={styles.emailText}>{email}</Text>
+
+        <Text style={styles.sectionLabel}>Nickname</Text>
+        <TextInput
+          style={styles.input}
+          value={nickname}
+          onChangeText={setNickname}
+          placeholder="Enter nickname"
+          placeholderTextColor="rgba(255,255,255,0.3)"
+        />
+
+        <Text style={styles.sectionLabel}>Description</Text>
         <TextInput
           style={styles.descriptionBox}
-          placeholder="Share a little about yourself..."
-          placeholderTextColor="rgba(255,255,255,0.5)"
           multiline
           value={description}
           onChangeText={setDescription}
+          placeholder="Share a little about yourself..."
+          placeholderTextColor="rgba(255,255,255,0.3)"
         />
+
+        <Pressable onPress={handleSave} style={styles.saveButton}>
+          {isSaving ? (
+            <ActivityIndicator color="#FFF" />
+          ) : (
+            <Text style={styles.actionText}>Confirm Changes</Text>
+          )}
+        </Pressable>
 
         <Pressable
           onPress={() => setLogoutVisible(true)}
-          style={({ pressed }) => [
-            styles.logoutButton,
-            pressed && styles.actionButtonPressed,
-          ]}
+          style={styles.logoutButton}
         >
           <Text style={styles.actionText}>Log out</Text>
         </Pressable>
       </ScrollView>
 
-      <Modal
-        transparent
-        visible={logoutVisible}
-        animationType="fade"
-        onRequestClose={() => setLogoutVisible(false)}
-      >
+      {/* MODAL IS HERE - It must be in the return block! */}
+      <Modal transparent visible={logoutVisible} animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>Log out of your account?</Text>
             <View style={styles.modalActions}>
               <Pressable
                 onPress={() => setLogoutVisible(false)}
-                style={({ pressed }) => [
-                  styles.modalButton,
-                  pressed && styles.modalButtonPressed,
-                ]}
+                style={styles.modalButton}
               >
                 <Text style={styles.modalButtonText}>Cancel</Text>
               </Pressable>
               <Pressable
                 onPress={handleLogout}
-                style={({ pressed }) => [
-                  styles.modalButton,
-                  styles.modalButtonDanger,
-                  pressed && styles.modalButtonPressed,
-                ]}
+                style={[styles.modalButton, styles.modalButtonDanger]}
               >
                 <Text style={styles.modalButtonText}>Log out</Text>
               </Pressable>
@@ -132,90 +178,62 @@ export default function ProfileScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  speck: {
-    position: "absolute",
-    width: 1,
-    height: 1,
-    borderRadius: 0.5,
-    backgroundColor: "rgba(255,255,255,0.92)",
-    shadowColor: "rgba(255,255,255,0.9)",
-    shadowOffset: { width: 0, height: 0 },
-    shadowRadius: 10,
-    shadowOpacity: 1,
-    elevation: 1,
-  },
   content: {
     paddingHorizontal: 24,
     alignItems: "center",
+    flexGrow: 1,
+    paddingBottom: 50,
   },
-  avatarWrapper: {
-    marginTop: 12,
-    marginBottom: 18,
+  avatarWrapper: { marginTop: 12, marginBottom: 18 },
+  avatarImage: {
+    width: 150,
+    height: 150,
+    borderRadius: 75,
+    borderWidth: 2,
+    borderColor: "rgba(255,255,255,0.2)",
   },
-  avatarCircle: {
-    width: 110,
-    height: 110,
-    borderRadius: 55,
-    backgroundColor: "rgba(255,255,255,0.15)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  avatarIcon: { fontSize: 40, color: "#FFFFFF" },
-  avatarImage: { width: 180, height: 180, borderRadius: 90 },
-  avatarBadge: {
-    position: "absolute",
-    right: 0,
-    bottom: 6,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: "#E1F2FF",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  avatarBadgeText: { color: "#0B1F3C", fontWeight: "bold" },
-  name: {
-    color: "#FFFFFF",
-    fontSize: 20,
-    marginBottom: 8,
-  },
+  emailText: { color: "rgba(255,255,255,0.5)", fontSize: 14, marginBottom: 24 },
   sectionLabel: {
     color: "rgba(255,255,255,0.7)",
     fontSize: 12,
     alignSelf: "flex-start",
     marginBottom: 6,
   },
+  input: {
+    width: "100%",
+    color: "#FFF",
+    fontSize: 18,
+    padding: 12,
+    backgroundColor: "rgba(255,255,255,0.1)",
+    borderRadius: 12,
+    marginBottom: 16,
+  },
   descriptionBox: {
     width: "100%",
     height: 90,
-    borderRadius: 18,
-    backgroundColor: "transparent",
-    borderWidth: 1,
-    borderColor: "rgba(225,242,255,0.4)",
-    marginBottom: 18,
+    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.1)",
     padding: 12,
     color: "#FFFFFF",
-    textAlignVertical: "top",
+    marginBottom: 24,
   },
-  actionButtonPressed: {
-    opacity: 0.7,
+  saveButton: {
+    width: "100%",
+    padding: 16,
+    borderRadius: 24,
+    backgroundColor: "#1E3A78",
+    alignItems: "center",
+    marginBottom: 12,
   },
   logoutButton: {
-    width: 190,
-    height: 48,
+    width: "100%",
+    padding: 16,
     borderRadius: 24,
-    backgroundColor: "transparent",
     borderWidth: 1,
-    borderColor: "rgba(225,242,255,0.6)",
-    justifyContent: "center",
+    borderColor: "#FFF",
     alignItems: "center",
-    marginTop: 8,
   },
-  actionText: {
-    color: "#FFFFFF",
-    fontSize: 13,
-    fontFamily: "monospace",
-  },
+  actionText: { color: "#FFFFFF", fontWeight: "bold" },
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(6, 12, 28, 0.85)",
@@ -231,7 +249,6 @@ const styles = StyleSheet.create({
     borderColor: "rgba(225,242,255,0.35)",
   },
   modalTitle: {
-    fontFamily: "Georgia",
     fontSize: 18,
     color: "#FFFFFF",
     textAlign: "center",
@@ -249,18 +266,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(225,242,255,0.5)",
     alignItems: "center",
-    backgroundColor: "transparent",
   },
-  modalButtonDanger: {
-    borderColor: "rgba(209, 27, 27, 0.7)",
-  },
-  modalButtonPressed: {
-    opacity: 0.7,
-  },
-  modalButtonText: {
-    fontFamily: "monospace",
-    color: "#FFFFFF",
-    fontSize: 13,
-    letterSpacing: 0.6,
-  },
+  modalButtonDanger: { borderColor: "rgba(209, 27, 27, 0.7)" },
+  modalButtonText: { color: "#FFFFFF", fontSize: 13 },
 });

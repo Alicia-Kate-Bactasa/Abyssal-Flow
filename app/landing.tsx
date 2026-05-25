@@ -587,7 +587,9 @@ export default function LandingScreen() {
     } catch {
       // ignore
     }
-  }, [replacePeriodDates]);
+    // run only on mount; avoid depending on `replacePeriodDates` identity
+    // which can change during render and cause effect loops.
+  }, []);
 
   // ── Step title & subtitle ───────────────────────────────────────────────────
   const stepMeta: Record<number, { title: string; subtitle?: string }> = {
@@ -691,7 +693,9 @@ export default function LandingScreen() {
                 <Text
                   style={[
                     s.birthdayFieldText,
-                    birthday ? s.birthdayFieldValue : s.birthdayFieldPlaceholder,
+                    birthday
+                      ? s.birthdayFieldValue
+                      : s.birthdayFieldPlaceholder,
                   ]}
                 >
                   {birthday || "MM/DD/YY"}
@@ -711,7 +715,15 @@ export default function LandingScreen() {
 
             <BottomSheetDatePicker
               visible={birthdayPickerOpen}
-              initialDate={parseShortToParts(birthday) ? new Date(parseShortToParts(birthday)!.year, parseShortToParts(birthday)!.month, parseShortToParts(birthday)!.day) : undefined}
+              initialDate={
+                parseShortToParts(birthday)
+                  ? new Date(
+                      parseShortToParts(birthday)!.year,
+                      parseShortToParts(birthday)!.month,
+                      parseShortToParts(birthday)!.day,
+                    )
+                  : undefined
+              }
               onCancel={() => setBirthdayPickerOpen(false)}
               onConfirm={(short) => {
                 setBirthday(short);
@@ -844,8 +856,8 @@ export default function LandingScreen() {
             </View>
 
             {(() => {
-                const firstDay = getFirstDayOfMonth(calendarYear, currentMonth);
-                  const daysInMonth = getDaysInMonth(calendarYear, currentMonth);
+              const firstDay = getFirstDayOfMonth(calendarYear, currentMonth);
+              const daysInMonth = getDaysInMonth(calendarYear, currentMonth);
               const cells: (number | null)[] = [
                 ...Array(firstDay).fill(null),
                 ...Array.from({ length: daysInMonth }, (_, i) => i + 1),

@@ -1,8 +1,18 @@
-import { formatDateKey, useCycleData } from "@/hooks/use-cycle-store";
+import {
+  formatDateKey,
+  parseDateKey,
+  useCycleData,
+} from "@/hooks/use-cycle-store";
 import { useUser } from "@/hooks/use-user-store";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   Animated,
   Dimensions,
@@ -20,9 +30,7 @@ const { width, height } = Dimensions.get("window");
 const MOON_SIZE = width * 0.74;
 const WRAPPER_SIZE = width * 1.6;
 const DAY_CIRCLE_RADIUS = MOON_SIZE / 2 + 25;
-// indicator constants removed — indicator hidden per UX request
 const MOON_INSET = 8;
-
 
 const DIAL_CENTER_X = width / 2;
 const DIAL_CENTER_Y = height * 0.28 + WRAPPER_SIZE / 2;
@@ -45,28 +53,14 @@ type PhaseConfig = {
 
 const DAY_MS = 1000 * 60 * 60 * 24;
 
-const getCycleDay = (day: number, cycleLength: number) => ((day - 1) % cycleLength) + 1;
-
-const getPhaseKey = (cycleDay: number, cycleLength: number): PhaseKey => {
-  const menstrualEnd = Math.max(4, Math.round(cycleLength * 0.18));
-  const follicularEnd = Math.max(menstrualEnd + 1, Math.round(cycleLength * 0.46));
-  const ovulationEnd = Math.max(follicularEnd + 1, Math.round(cycleLength * 0.61));
-
-  if (cycleDay <= menstrualEnd) return "menstrual";
-  if (cycleDay <= follicularEnd) return "follicular";
-  if (cycleDay <= ovulationEnd) return "ovulation";
-  return "luteal";
-};
-
 const getDaysBetween = (start: Date, end: Date) => {
-  const startUtc = Date.UTC(start.getFullYear(), start.getMonth(), start.getDate());
+  const startUtc = Date.UTC(
+    start.getFullYear(),
+    start.getMonth(),
+    start.getDate(),
+  );
   const endUtc = Date.UTC(end.getFullYear(), end.getMonth(), end.getDate());
-  return Math.max(0, Math.floor((endUtc - startUtc) / DAY_MS));
-};
-
-const getCycleDayFromDates = (anchor: Date, date: Date, cycleLength: number) => {
-  const daysSinceStart = getDaysBetween(anchor, date);
-  return (daysSinceStart % cycleLength) + 1;
+  return Math.floor((endUtc - startUtc) / DAY_MS);
 };
 
 const WAVE_X = {
@@ -95,8 +89,16 @@ const interpolateWavePoints = (
   from: [number, number, number, number, number, number, number],
   to: [number, number, number, number, number, number, number],
   t: number,
-) => from.map((value, index) => value + (to[index] - value) * t) as
-  [number, number, number, number, number, number, number];
+) =>
+  from.map((value, index) => value + (to[index] - value) * t) as [
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+  ];
 
 const PHASES: Record<PhaseKey, PhaseConfig> = {
   menstrual: {
@@ -160,7 +162,11 @@ const TinySpeck = ({
   opacity: number;
   size: number;
 }) => {
-  return <View style={[styles.speck, { top, left, opacity, width: size, height: size }]} />;
+  return (
+    <View
+      style={[styles.speck, { top, left, opacity, width: size, height: size }]}
+    />
+  );
 };
 
 const BackgroundSparkles = () => {
@@ -179,7 +185,13 @@ const BackgroundSparkles = () => {
   return (
     <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
       {specks.map((speck) => (
-        <TinySpeck key={speck.id} top={speck.top} left={speck.left} opacity={speck.opacity} size={speck.size} />
+        <TinySpeck
+          key={speck.id}
+          top={speck.top}
+          left={speck.left}
+          opacity={speck.opacity}
+          size={speck.size}
+        />
       ))}
     </View>
   );
@@ -193,14 +205,12 @@ const CircularCalendarDial = ({
   onDateChange,
   activeDay,
   moonColor,
-  anchorCycleDay,
   onProvideReset,
 }: {
   onDayChange: (day: number) => void;
   onDateChange: (date: Date) => void;
   activeDay: number;
   moonColor: string;
-  anchorCycleDay: number;
   onProvideReset?: (fn: () => void) => void;
 }) => {
   const [viewDate, setViewDate] = useState(new Date());
@@ -219,17 +229,17 @@ const CircularCalendarDial = ({
     ? -(currentDay - 1) * angleSlice
     : 0;
 
-  const rotationAngle = useRef(new Animated.Value(initialRotationAngle)).current;
+  const rotationAngle = useRef(
+    new Animated.Value(initialRotationAngle),
+  ).current;
   const currentAngleRef = useRef(initialRotationAngle);
 
-  
   const previousAngleRef = useRef(0);
 
   const lastTickRef = useRef(Math.round(initialRotationAngle / angleSlice));
 
   useEffect(() => {
     onDateChange(viewDate);
-    // selected log date will be synced by Dashboard component using cycle store
   }, [onDateChange, viewDate]);
 
   const normalizeAngleToMonth = useCallback(
@@ -337,8 +347,6 @@ const CircularCalendarDial = ({
     if (onProvideReset) onProvideReset(resetToToday);
   }, [onProvideReset, resetToToday]);
 
-  // inactivity auto-reset removed — explicit Today button is used instead
-
   const snapToNearest = useCallback(
     (fromVelocityDegPerMs = 0) => {
       const raw = currentAngleRef.current;
@@ -364,96 +372,99 @@ const CircularCalendarDial = ({
             currentAngleRef.current = normalized.angle;
           }
           onDayChange(snappedDay);
-          const snappedDate = new Date(normalized.year, normalized.month, snappedDay);
+          const snappedDate = new Date(
+            normalized.year,
+            normalized.month,
+            snappedDay,
+          );
           onDateChange(snappedDate);
-          // Dashboard will sync selected log date from footerDate
         }
       });
     },
     [
       angleSlice,
-        currentMonth,
-        currentYear,
-        onDateChange,
-        onDayChange,
-        normalizeAngleToMonth,
-        rotationAngle,
+      currentMonth,
+      currentYear,
+      onDateChange,
+      onDayChange,
+      normalizeAngleToMonth,
+      rotationAngle,
     ],
   );
 
-  // no inactivity timer
+  const panResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_evt, gs) => {
+          const distance = Math.sqrt(gs.dx * gs.dx + gs.dy * gs.dy);
+          return distance > 5;
+        },
+        onStartShouldSetPanResponder: () => false,
 
-  const panResponder = useRef(
-    PanResponder.create({
-      // Claim the gesture if the user moves their finger in ANY direction by 5 pixels
-      onMoveShouldSetPanResponder: (_evt, gs) => {
-        const distance = Math.sqrt(gs.dx * gs.dx + gs.dy * gs.dy);
-        return distance > 5;
-      },
-      onStartShouldSetPanResponder: () => false,
+        onPanResponderGrant: (_evt, gs) => {
+          rotationAngle.stopAnimation((stoppedAt) => {
+            currentAngleRef.current = stoppedAt;
+          });
 
-      onPanResponderGrant: (_evt, gs) => {
-        rotationAngle.stopAnimation((stoppedAt) => {
-          currentAngleRef.current = stoppedAt;
-        });
+          const rx = gs.x0 - DIAL_CENTER_X;
+          const ry = gs.y0 - DIAL_CENTER_Y;
+          previousAngleRef.current = Math.atan2(ry, rx);
+        },
 
-        // Calculate the exact starting angle using Math.atan2
-        const rx = gs.x0 - DIAL_CENTER_X;
-        const ry = gs.y0 - DIAL_CENTER_Y;
-        previousAngleRef.current = Math.atan2(ry, rx);
-      },
+        onPanResponderMove: (_evt, gs) => {
+          const rx = gs.moveX - DIAL_CENTER_X;
+          const ry = gs.moveY - DIAL_CENTER_Y;
+          const currentAngle = Math.atan2(ry, rx);
 
-      onPanResponderMove: (_evt, gs) => {
-       
-        const rx = gs.moveX - DIAL_CENTER_X;
-        const ry = gs.moveY - DIAL_CENTER_Y;
-        const currentAngle = Math.atan2(ry, rx);
+          let deltaAngle = currentAngle - previousAngleRef.current;
 
-    
-        let deltaAngle = currentAngle - previousAngleRef.current;
+          if (deltaAngle > Math.PI) deltaAngle -= 2 * Math.PI;
+          if (deltaAngle < -Math.PI) deltaAngle += 2 * Math.PI;
 
-     
-        if (deltaAngle > Math.PI) deltaAngle -= 2 * Math.PI;
-        if (deltaAngle < -Math.PI) deltaAngle += 2 * Math.PI;
+          const deltaDeg = deltaAngle * (180 / Math.PI);
+          currentAngleRef.current += deltaDeg;
+          rotationAngle.setValue(currentAngleRef.current);
 
-    
-        const deltaDeg = deltaAngle * (180 / Math.PI);
-        currentAngleRef.current += deltaDeg;
-        rotationAngle.setValue(currentAngleRef.current);
+          previousAngleRef.current = currentAngle;
+        },
 
-   
-        previousAngleRef.current = currentAngle;
-      },
+        onPanResponderRelease: (_evt, gs) => {
+          const rx = gs.moveX - DIAL_CENTER_X;
+          const ry = gs.moveY - DIAL_CENTER_Y;
+          const rSquared = rx * rx + ry * ry;
 
-      onPanResponderRelease: (_evt, gs) => {
-        const rx = gs.moveX - DIAL_CENTER_X;
-        const ry = gs.moveY - DIAL_CENTER_Y;
-        const rSquared = rx * rx + ry * ry;
-
-        // Angular Velocity Physics Formula: ω = (r_x * v_y - r_y * v_x) / r^2
-        let angularVelocityRadPerMs = 0;
-        if (rSquared > 0) {
-          angularVelocityRadPerMs = (rx * gs.vy - ry * gs.vx) / rSquared;
-        }
-
-        const velocityDegPerMs = angularVelocityRadPerMs * (180 / Math.PI);
-
-        Animated.decay(rotationAngle, {
-          velocity: velocityDegPerMs,
-          deceleration: DECAY_DECELERATION,
-          useNativeDriver: true,
-        }).start(({ finished }) => {
-          if (finished) {
-            snapToNearest(0);
+          let angularVelocityRadPerMs = 0;
+          if (rSquared > 0) {
+            angularVelocityRadPerMs = (rx * gs.vy - ry * gs.vx) / rSquared;
           }
-        });
-      },
 
-      onPanResponderTerminate: () => {
-        snapToNearest(0);
-      },
-    }),
-  ).current;
+          const velocityDegPerMs = angularVelocityRadPerMs * (180 / Math.PI);
+
+          Animated.decay(rotationAngle, {
+            velocity: velocityDegPerMs,
+            deceleration: DECAY_DECELERATION,
+            useNativeDriver: true,
+          }).start(({ finished }) => {
+            if (finished) {
+              snapToNearest(0);
+            }
+          });
+        },
+
+        onPanResponderTerminate: () => {
+          snapToNearest(0);
+        },
+      }),
+    [
+      currentMonth,
+      currentYear,
+      normalizeAngleToMonth,
+      angleSlice,
+      daysInMonth,
+      rotationAngle,
+      snapToNearest,
+    ],
+  );
 
   const rotateInterpolate = rotationAngle.interpolate({
     inputRange: [-10000, 10000],
@@ -489,7 +500,12 @@ const CircularCalendarDial = ({
           ]}
         >
           <Text style={styles.weekdayLabel}>{dayName}</Text>
-          <View style={[styles.dayNumberCircle, isActiveDay && styles.dayNumberCircleActive]}>
+          <View
+            style={[
+              styles.dayNumberCircle,
+              isActiveDay && styles.dayNumberCircleActive,
+            ]}
+          >
             <Text style={styles.dayNumberText}>{day}</Text>
           </View>
         </View>,
@@ -504,7 +520,7 @@ const CircularCalendarDial = ({
         style={[
           styles.moonGlowCore,
           {
-              backgroundColor: moonColor,
+            backgroundColor: moonColor,
             top: (WRAPPER_SIZE - MOON_SIZE) / 2 + MOON_INSET,
             left: (WRAPPER_SIZE - MOON_SIZE) / 2,
           },
@@ -534,11 +550,24 @@ const CircularCalendarDial = ({
 // ==========================================
 export default function Dashboard() {
   const cycleData = useCycleData() as any;
-  const { getCycleStats, getLatestPeriodStart, daysLate, requestLogModal, setSelectedLogDate, periodDates } = cycleData;
+  const {
+    getCycleStats,
+    getLatestPeriodStart,
+    daysLate,
+    requestLogModal,
+    setSelectedLogDate,
+    periodDates,
+    predictedDates,
+    predictedStarts,
+    isDateInMissedPredictedWindow,
+  } = cycleData;
   const { user } = useUser();
-  const [resetToTodayFn, setResetToTodayFn] = useState<(() => void) | null>(null);
+  const [resetToTodayFn, setResetToTodayFn] = useState<(() => void) | null>(
+    null,
+  );
   const [activeDay, setActiveDay] = useState(new Date().getDate());
   const [footerDate, setFooterDate] = useState(new Date());
+
   useEffect(() => {
     try {
       if (typeof setSelectedLogDate === "function") {
@@ -548,8 +577,21 @@ export default function Dashboard() {
       // ignore
     }
   }, [footerDate, setSelectedLogDate]);
+
   const cycleStats = getCycleStats();
   const latestPeriodStart = getLatestPeriodStart();
+  const prevLatestStartRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const newKey = latestPeriodStart ? formatDateKey(latestPeriodStart) : null;
+    if (newKey !== prevLatestStartRef.current) {
+      prevLatestStartRef.current = newKey;
+      setFooterDate(new Date());
+      setActiveDay(new Date().getDate());
+      if (resetToTodayFn) resetToTodayFn();
+    }
+  }, [latestPeriodStart, resetToTodayFn]);
+
   const cycleLength = cycleStats.cycleLength;
   const rawGreetingName =
     (cycleData.profile?.nickname && cycleData.profile.nickname.trim()) ||
@@ -562,16 +604,99 @@ export default function Dashboard() {
     rawGreetingName.toLowerCase() !== "profile"
       ? rawGreetingName
       : "there";
-  const cycleDay = latestPeriodStart
-    ? getCycleDayFromDates(latestPeriodStart, footerDate, cycleLength)
-    : getCycleDay(activeDay, cycleLength);
-  let phaseKey = getPhaseKey(cycleDay, cycleLength);
-  const isLoggedPeriodDay = Boolean(periodDates?.[formatDateKey(footerDate)]);
-  const isMissed = typeof cycleData.isDateInMissedPredictedWindow === "function" ? cycleData.isDateInMissedPredictedWindow(new Date()) : false;
-  if (isLoggedPeriodDay) phaseKey = "menstrual";
-  else if (isMissed) phaseKey = "luteal";
+
+  // =========================================================
+  // THE NEW, PERFECTLY SYNCED PHASE LOGIC
+  // =========================================================
+  const targetKey = formatDateKey(footerDate);
+
+  // 1. Explicitly check the store to see if this is a real or predicted period day
+  const isLoggedPeriodDay = Boolean(periodDates?.[targetKey]);
+  const isPredictedPeriodDay = Boolean(predictedDates?.[targetKey]);
+  const isExplicitMenstrual = isLoggedPeriodDay || isPredictedPeriodDay;
+  const isMissed =
+    typeof isDateInMissedPredictedWindow === "function"
+      ? isDateInMissedPredictedWindow(footerDate)
+      : false;
+
+  // 2. Find the closest actual anchor period start
+  const loggedKeys = Object.keys(periodDates || {}).sort();
+  const pastLogged = loggedKeys.filter((k) => k <= targetKey);
+  let anchorDate: Date | null = null;
+
+  if (pastLogged.length > 0) {
+    let lastDay = pastLogged[pastLogged.length - 1];
+    let d = parseDateKey(lastDay);
+    while (true) {
+      const prev = new Date(d);
+      prev.setDate(prev.getDate() - 1);
+      if (periodDates?.[formatDateKey(prev)]) d = prev;
+      else break;
+    }
+    anchorDate = d;
+  }
+
+  // 3. Jump to future predicted anchors if scrolling forward
+  if (predictedStarts && predictedStarts.length > 0) {
+    const pastPredicted = [...predictedStarts]
+      .sort()
+      .filter((k) => k <= targetKey);
+    if (pastPredicted.length > 0) {
+      const latestPredicted = parseDateKey(
+        pastPredicted[pastPredicted.length - 1],
+      );
+      if (!anchorDate || latestPredicted.getTime() > anchorDate.getTime()) {
+        anchorDate = latestPredicted;
+      }
+    }
+  }
+
+  // 4. Calculate the real Cycle Day
+  let cycleDay = 1;
+  if (anchorDate) {
+    if (footerDate.getTime() >= anchorDate.getTime()) {
+      cycleDay = getDaysBetween(anchorDate, footerDate) + 1;
+    } else {
+      const diff = getDaysBetween(anchorDate, footerDate);
+      const remainder = diff % cycleLength;
+      cycleDay = remainder === 0 ? 1 : cycleLength + remainder + 1;
+    }
+  }
+
+  // 5. Determine the Phase matching the calendar exactly
+  // 5. Determine the Phase matching the calendar exactly
+  let phaseKey: PhaseKey = "luteal";
+
+  // IF IT IS LOGGED OR PREDICTED, IT IS MENSTRUAL. PERIOD.
+  if (isLoggedPeriodDay || isPredictedPeriodDay) {
+    phaseKey = "menstrual";
+  }
+  // ONLY USE APPROXIMATION MATH IF IT IS NOT A PERIOD DAY
+  else {
+    // We only use the estimation math for Follicular/Ovulation/Luteal
+    const menstrualEnd = Math.max(4, Math.round(cycleLength * 0.18));
+    const follicularEnd = Math.max(
+      menstrualEnd + 1,
+      Math.round(cycleLength * 0.46),
+    );
+    const ovulationEnd = Math.max(
+      follicularEnd + 1,
+      Math.round(cycleLength * 0.61),
+    );
+
+    if (cycleDay <= menstrualEnd)
+      phaseKey = "menstrual"; // Safety fallback
+    else if (cycleDay <= follicularEnd) phaseKey = "follicular";
+    else if (cycleDay <= ovulationEnd) phaseKey = "ovulation";
+    else if (isMissed)
+      phaseKey = "luteal"; // Missed windows are only considered if not menstrual
+    else phaseKey = "luteal";
+  }
+
   const phase = PHASES[phaseKey];
   const daysUntilPeriod = cycleLength - cycleDay + 1;
+
+  // =========================================================
 
   const [previousPhaseKey, setPreviousPhaseKey] = useState<PhaseKey>(phaseKey);
   const fadeAnim = useRef(new Animated.Value(1)).current;
@@ -579,6 +704,7 @@ export default function Dashboard() {
   const waveFromRef = useRef(phase.wavePoints);
   const waveToRef = useRef(phase.wavePoints);
   const [wavePath, setWavePath] = useState(buildWavePath(phase.wavePoints));
+
   const handleProvideReset = useCallback((fn: () => void) => {
     setResetToTodayFn(() => fn);
   }, []);
@@ -603,12 +729,7 @@ export default function Dashboard() {
         useNativeDriver: false,
       }).start();
     }
-  }, [
-    fadeAnim,
-    phaseKey,
-    previousPhaseKey,
-    waveMorphAnim,
-  ]);
+  }, [fadeAnim, phaseKey, previousPhaseKey, waveMorphAnim]);
 
   useEffect(() => {
     const id = waveMorphAnim.addListener(({ value }) => {
@@ -649,7 +770,6 @@ export default function Dashboard() {
           onDateChange={setFooterDate}
           activeDay={activeDay}
           moonColor={phase.moonColor}
-          anchorCycleDay={cycleDay}
           onProvideReset={handleProvideReset}
         />
       </View>
@@ -668,7 +788,9 @@ export default function Dashboard() {
           <Text style={styles.greeting}>Hello, {greetingName}!</Text>
           {daysLate > 0 && !isLoggedPeriodDay ? (
             <Text style={styles.delayed}>
-              {daysLate === 1 ? "1 day period delayed" : `${daysLate} days period delayed`}
+              {daysLate === 1
+                ? "1 day period delayed"
+                : `${daysLate} days period delayed`}
             </Text>
           ) : (
             <Text style={styles.subGreeting}>{subGreetingText}</Text>
@@ -679,7 +801,7 @@ export default function Dashboard() {
         </View>
 
         <View style={styles.bottomInfo} pointerEvents="box-none">
-            <View style={styles.bottomPrimaryCluster}>
+          <View style={styles.bottomPrimaryCluster}>
             {resetToTodayFn ? (
               <TouchableOpacity
                 activeOpacity={0.85}
@@ -691,28 +813,28 @@ export default function Dashboard() {
             ) : null}
             <Text style={styles.bigDayText}>DAY {cycleDay}</Text>
             <Text style={styles.ofCycle}>of cycle</Text>
-            </View>
-            <Text style={styles.monthFooter}>
-              {footerDate
-                .toLocaleString("default", { month: "long" })
-                .toUpperCase()}
-            </Text>
-            {(phaseKey === "menstrual" || daysLate > 0) ? (
-              <TouchableOpacity
-                activeOpacity={0.85}
-                onPress={() => {
-                  try {
-                    requestLogModal?.();
-                  } catch {
-                    // ignore
-                  }
-                }}
-                style={styles.logPeriodButton}
-              >
-                <Text style={styles.logPeriodText}>Log period</Text>
-              </TouchableOpacity>
-            ) : null}
           </View>
+          <Text style={styles.monthFooter}>
+            {footerDate
+              .toLocaleString("default", { month: "long" })
+              .toUpperCase()}
+          </Text>
+          {phaseKey === "menstrual" || daysLate > 0 ? (
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={() => {
+                try {
+                  requestLogModal?.();
+                } catch {
+                  // ignore
+                }
+              }}
+              style={styles.logPeriodButton}
+            >
+              <Text style={styles.logPeriodText}>Log period</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
       </View>
     </View>
   );

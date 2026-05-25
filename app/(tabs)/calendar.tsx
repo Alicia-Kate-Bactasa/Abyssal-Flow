@@ -2,6 +2,7 @@ import {
   formatDateKey,
   parseDateKey,
   useCycleData,
+  buildPeriodRuns,
 } from "@/hooks/use-cycle-store";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
@@ -64,32 +65,7 @@ const formatMonthLabel = (year: number, month: number) =>
     year: "numeric",
   });
 
-const buildPeriodRuns = (keys: string[]) => {
-  const sorted = [...keys].sort(
-    (a, b) => parseDateKey(a).getTime() - parseDateKey(b).getTime(),
-  );
-  const runs: string[][] = [];
-  let current: string[] = [];
-
-  sorted.forEach((key) => {
-    if (!current.length) {
-      current.push(key);
-      return;
-    }
-    const prev = parseDateKey(current[current.length - 1]);
-    const next = parseDateKey(key);
-    const diff = (next.getTime() - prev.getTime()) / (1000 * 60 * 60 * 24);
-    if (diff === 1) {
-      current.push(key);
-    } else {
-      runs.push(current);
-      current = [key];
-    }
-  });
-
-  if (current.length) runs.push(current);
-  return runs;
-};
+// use store's exported buildPeriodRuns (gap-tolerant)
 
 const TinySpeck = ({
   top,
@@ -249,8 +225,8 @@ export default function CalendarScreen() {
     periodDates,
     predictedDates,
     replacePeriodDates,
-    recalcPredictions,
     getCycleStats,
+    recalcPredictions,
   } = useCycleData();
 
   const [activeSegment, setActiveSegment] = useState<"calendar" | "pattern">(
@@ -311,8 +287,11 @@ export default function CalendarScreen() {
   );
 
   const handleSave = () => {
+    // compute authoritative next map from draftKeys and recalc predictions
+    const next: Record<string, true> = {};
+    draftKeys.forEach((k) => (next[k] = true));
     replacePeriodDates(draftKeys);
-    recalcPredictions();
+    recalcPredictions(next);
   };
 
   const handleTabSwitch = (tab: "calendar" | "pattern") => {
