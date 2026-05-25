@@ -1,6 +1,8 @@
 import { useUser } from "@/hooks/use-user-store";
 import { supabaseClient } from "@/lib/supabase";
 import * as ImagePicker from "expo-image-picker";
+import * as FileSystem from "expo-file-system"; // <-- ADD THIS
+import { decode } from "base64-arraybuffer"; // <-- ADD THIS
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
@@ -27,11 +29,25 @@ export default function ProfileScreen() {
   const [description, setDescription] = useState(user.description || "");
   const [email, setEmail] = useState("");
   const [avatar, setAvatar] = useState(
-    require("../../assets/images/profile.png"),
+    user.avatar_url
+      ? { uri: user.avatar_url }
+      : require("../../assets/images/profile.png"),
   );
   const [isSaving, setIsSaving] = useState(false);
   const [logoutVisible, setLogoutVisible] = useState(false);
 
+  // 1. THIS IS THE NEW FIX: Actively listen for the URL to finish loading
+  useEffect(() => {
+    if (user.avatar_url) {
+      // Adding a timestamp bypasses React Native's aggressive image caching
+      // so it always shows the newest photo instead of an old cached one
+      setAvatar({ uri: `${user.avatar_url}?t=${new Date().getTime()}` });
+    } else {
+      setAvatar(require("../../assets/images/profile.png"));
+    }
+  }, [user.avatar_url]);
+
+  // 2. Your existing email fetcher
   useEffect(() => {
     supabaseClient.auth.getUser().then(({ data }) => {
       if (data.user) setEmail(data.user.email || "");
@@ -52,7 +68,7 @@ export default function ProfileScreen() {
 
   const pickImage = async () => {
     let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ImagePicker.MediaTypeOptions.Images, // Use MediaType.Images if preferred
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.5,
@@ -63,39 +79,38 @@ export default function ProfileScreen() {
       setAvatar({ uri });
 
       try {
-        // 1. Fetch the image to create a Blob
-        const response = await fetch(uri);
-        const blob = await response.blob();
+        const userId = user.id;
+        const fileName = `${userId}/avatar.png`;
 
-        const {
-          data: { user: authUser },
-        } = await supabaseClient.auth.getUser();
-        const userId = user.id || authUser?.id;
+        // 1. THE MAGIC FIX: Create a standard FormData payload
+        const formData = new FormData();
+        formData.append("file", {
+          uri: uri,
+          name: "avatar.png",
+          type: "image/png",
+        } as any); // "as any" stops TypeScript from complaining about the React Native specific formatting
 
-        if (!userId) throw new Error("No user ID found");
-
-        const fileName = `${userId}/avatar.png`; // Overwrite existing to keep storage clean
-
-        // 2. Upload to Supabase Storage (Bucket name: 'avatars')
-        // NOTE: If the file exists, you may need upsert: true
+        // 2. Upload the FormData directly
         const { error: uploadError } = await supabaseClient.storage
           .from("avatars")
-          .upload(fileName, blob, { contentType: "image/png", upsert: true });
+          .upload(fileName, formData, {
+            upsert: true,
+          });
 
-        if (uploadError) throw uploadError;
+        if (uploadError) {
+          throw new Error("Upload Error: " + uploadError.message);
+        }
 
-        // 3. Get the Public URL
-        const { data: publicUrlData } = supabaseClient.storage
+        // 3. Update the Database
+        const { data } = supabaseClient.storage
           .from("avatars")
           .getPublicUrl(fileName);
 
-        // 4. Save that URL to your 'profiles' table
-        await updateUser({ avatar_url: publicUrlData.publicUrl });
-
-        alert("Profile picture updated!");
+        await updateUser({ avatar_url: data.publicUrl });
+        alert("Profile picture saved!");
       } catch (err) {
-        console.error("Upload failed:", err);
-        alert("Failed to upload image.");
+        console.error("Profile Pic Error:", err);
+        alert("Failed to save picture. Check console.");
       }
     }
   };
@@ -107,10 +122,18 @@ export default function ProfileScreen() {
           styles.content,
           { paddingTop: 24 + insets.top },
         ]}
-        keyboardShouldPersistTaps="handled" // <--- CRITICAL for buttons in ScrollViews
+        keyboardShouldPersistTaps="handled"
       >
         <Pressable onPress={pickImage} style={styles.avatarWrapper}>
-          <Image source={avatar} style={styles.avatarImage} />
+          {/* 3. UPDATED KEY: Ensure the key is always a valid string */}
+          <Image
+            key={user.avatar_url || "default-avatar"}
+            source={avatar}
+            style={styles.avatarImage}
+            onError={(e) =>
+              console.log("IMAGE LOAD ERROR:", e.nativeEvent.error)
+            } // <-- Add this line
+          />
         </Pressable>
 
         <Text style={styles.emailText}>{email}</Text>
@@ -150,7 +173,6 @@ export default function ProfileScreen() {
         </Pressable>
       </ScrollView>
 
-      {/* MODAL IS HERE - It must be in the return block! */}
       <Modal transparent visible={logoutVisible} animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>

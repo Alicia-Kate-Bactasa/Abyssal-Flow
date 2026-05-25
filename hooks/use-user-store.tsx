@@ -1,6 +1,6 @@
 import { supabaseClient } from "@/lib/supabase";
 import React, { createContext, useContext, useEffect, useState } from "react";
-
+import * as SecureStore from "expo-secure-store";
 type User = {
   id: string;
   nickname: string;
@@ -29,9 +29,13 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
   // Load user data on startup
   useEffect(() => {
+    const clearOldData = async () => {
+      await SecureStore.deleteItemAsync("user_data"); // Use your actual storage key here
+    };
+    clearOldData();
     let active = true;
 
-    const fetchUser = async () => {
+    const fetchFreshProfile = async () => {
       try {
         const {
           data: { user: authUser },
@@ -39,7 +43,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         if (!authUser) return;
 
         // Fetch the REAL profile from the table, not just metadata
-        const { data: profile } = await supabaseClient
+        const { data: profile, error } = await supabaseClient
           .from("profiles")
           .select("*")
           .eq("id", authUser.id)
@@ -58,18 +62,33 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       }
     };
 
-    fetchUser();
+    fetchFreshProfile();
 
     const { data: authListener } = supabaseClient.auth.onAuthStateChange(
-      (_event, session) => {
+      async (_event, session) => {
         if (session?.user) {
-          const metadata = session.user.user_metadata;
+          // CALL THE DATABASE, NOT THE METADATA
+          const { data: profile, error } = await supabaseClient
+            .from("profiles")
+            .select("id, nickname, description, avatar_url")
+            .eq("id", session.user.id)
+            .single();
+
+          if (profile) {
+            setUser({
+              id: session.user.id,
+              nickname: profile.nickname || "",
+              description: profile.description || "",
+              avatar_url: profile.avatar_url || "",
+            });
+          }
+        } else {
+          // Clear user on logout
           setUser({
-            id: session.user.id,
-            nickname: metadata.nickname ?? "",
-            username: metadata.username,
-            description: metadata.description ?? "",
-            avatar_url: metadata.avatar_url ?? "",
+            id: "",
+            nickname: "",
+            description: "",
+            avatar_url: undefined,
           });
         }
       },
@@ -101,6 +120,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       const dbUpdates = {
         nickname: updates.nickname,
         description: updates.description,
+        avatar_url: updates.avatar_url,
         // username: updates.username // Only uncomment if this column exists in Supabase
       };
 
