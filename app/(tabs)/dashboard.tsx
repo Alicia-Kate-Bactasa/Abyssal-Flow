@@ -206,12 +206,16 @@ const CircularCalendarDial = ({
   activeDay,
   moonColor,
   onProvideReset,
+  periodDates,
+  predictedDates,
 }: {
   onDayChange: (day: number) => void;
   onDateChange: (date: Date) => void;
   activeDay: number;
   moonColor: string;
   onProvideReset?: (fn: () => void) => void;
+  periodDates?: Record<string, true>;
+  predictedDates?: Record<string, true>;
 }) => {
   const [viewDate, setViewDate] = useState(new Date());
 
@@ -244,41 +248,42 @@ const CircularCalendarDial = ({
 
   const normalizeAngleToMonth = useCallback(
     (value: number) => {
-      let nextYear = currentYear;
-      let nextMonth = currentMonth;
-      let nextDays = new Date(currentYear, currentMonth + 1, 0).getDate();
-      let nextSlice = 360 / nextDays;
-      let tick = Math.round(-value / nextSlice);
+      // Calculate an absolute day offset from the start of the current
+      // visible month by converting the incoming angle to a day tick
+      // and then applying that tick to the month's first day using
+      // Date arithmetic. This avoids looping and off-by-one errors
+      // when months have different lengths.
+      const daysInCurrentMonth = new Date(
+        currentYear,
+        currentMonth + 1,
+        0,
+      ).getDate();
+      const sliceForCurrent = 360 / daysInCurrentMonth;
+      const approxTick = Math.round(-value / sliceForCurrent);
 
-      while (tick >= nextDays) {
-        tick -= nextDays;
-        nextMonth += 1;
-        if (nextMonth > 11) {
-          nextMonth = 0;
-          nextYear += 1;
-        }
-        nextDays = new Date(nextYear, nextMonth + 1, 0).getDate();
-        nextSlice = 360 / nextDays;
-        value = -tick * nextSlice;
-      }
+      // Start at the 1st of the current view month and add the tick offset.
+      const base = new Date(currentYear, currentMonth, 1);
+      const targetDate = new Date(base);
+      targetDate.setDate(base.getDate() + approxTick);
 
-      while (tick < 0) {
-        nextMonth -= 1;
-        if (nextMonth < 0) {
-          nextMonth = 11;
-          nextYear -= 1;
-        }
-        nextDays = new Date(nextYear, nextMonth + 1, 0).getDate();
-        nextSlice = 360 / nextDays;
-        tick += nextDays;
-        value = -tick * nextSlice;
-      }
+      const targetYear = targetDate.getFullYear();
+      const targetMonth = targetDate.getMonth();
+      const targetDayIndex = targetDate.getDate() - 1;
+
+      // Recompute angle using the exact number of days in the target month
+      // so the position aligns with the actual month length.
+      const daysInTargetMonth = new Date(
+        targetYear,
+        targetMonth + 1,
+        0,
+      ).getDate();
+      const exactAngle = -(targetDayIndex * (360 / daysInTargetMonth));
 
       return {
-        year: nextYear,
-        month: nextMonth,
-        dayIndex: tick,
-        angle: value,
+        year: targetYear,
+        month: targetMonth,
+        dayIndex: targetDayIndex,
+        angle: exactAngle,
       };
     },
     [currentMonth, currentYear],
@@ -346,6 +351,51 @@ const CircularCalendarDial = ({
   useEffect(() => {
     if (onProvideReset) onProvideReset(resetToToday);
   }, [onProvideReset, resetToToday]);
+
+  // Force the dial to recenter / recalculate when the authoritative
+  // period maps change. This ensures the wheel reflects the store
+  // updates immediately (same behavior as the calendar UI).
+  useEffect(() => {
+    // noop if reset is not available
+    try {
+      resetToToday();
+    } catch {
+      // ignore
+    }
+  }, [periodDates, predictedDates, resetToToday]);
+
+  // If the user is focused on a day that doesn't exist in the newly
+  // selected month (e.g. day 31 -> month with 30 days), clamp the
+  // viewDate to the month's maximum to avoid abrupt disappearing
+  // items and layout jumps.
+  useEffect(() => {
+    const maxDays = new Date(currentYear, currentMonth + 1, 0).getDate();
+    const day = viewDate.getDate();
+    if (day > maxDays) {
+      const clamped = new Date(currentYear, currentMonth, maxDays);
+      setViewDate(clamped);
+
+      // update rotation and refs so UI stays consistent
+      const targetDays = new Date(currentYear, currentMonth + 1, 0).getDate();
+      const targetAngle = -(clamped.getDate() - 1) * (360 / targetDays);
+      rotationAngle.setValue(targetAngle);
+      currentAngleRef.current = targetAngle;
+      lastTickRef.current = clamped.getDate() - 1;
+      try {
+        onDayChange(clamped.getDate());
+        onDateChange(clamped);
+      } catch {
+        // ignore
+      }
+    }
+  }, [
+    currentMonth,
+    currentYear,
+    viewDate,
+    onDayChange,
+    onDateChange,
+    rotationAngle,
+  ]);
 
   const snapToNearest = useCallback(
     (fromVelocityDegPerMs = 0) => {
@@ -481,6 +531,11 @@ const CircularCalendarDial = ({
 
       const dateForDay = new Date(currentYear, currentMonth, day);
       const dayName = WEEKDAYS[dateForDay.getDay()];
+      // Use the calendar's authoritative maps to determine menstrual days
+      const key = formatDateKey(dateForDay);
+      // Strict authoritative source: only treat a day as menstrual
+      // if it is explicitly marked in the calendar's `periodDates` map.
+      const isPeriodDay = Boolean(periodDates?.[key]);
       const isActiveDay = day === activeDay;
 
       days.push(
@@ -545,22 +600,51 @@ const CircularCalendarDial = ({
   );
 };
 
-// ==========================================
-// 2. THE MAIN SCREEN EXPORT
-// ==========================================
 export default function Dashboard() {
   const cycleData = useCycleData() as any;
   const {
     getCycleStats,
     getLatestPeriodStart,
-    daysLate,
     requestLogModal,
     setSelectedLogDate,
     periodDates,
     predictedDates,
     predictedStarts,
-    isDateInMissedPredictedWindow,
   } = cycleData;
+
+  // daysLate: how many days past the next predicted start we are today.
+  // Derived locally from predictedStarts so it is always in sync with the
+  // same data the Calendar uses — no separate store field needed.
+  const todayKey = formatDateKey(new Date());
+  const nextStartKey = predictedStarts?.find((k: string) => k <= todayKey);
+  // nextStartKey is the most-recent predicted start that has already passed.
+  const daysLate = (() => {
+    if (!predictedStarts?.length) return 0;
+    // Find the first predicted start that is ≤ today and has no logged day near it.
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    for (const k of [...(predictedStarts as string[])].sort().reverse()) {
+      const d = parseDateKey(k);
+      if (d.getTime() > today.getTime()) continue;
+      // If any periodDates day falls within 0..avgPeriodLength days of this start,
+      // the period was logged — not late.
+      const cycleStats = getCycleStats();
+      const windowSize = cycleStats.avgPeriodLength ?? 5;
+      let found = false;
+      for (let i = 0; i < windowSize; i++) {
+        const check = new Date(d.getFullYear(), d.getMonth(), d.getDate() + i);
+        if (periodDates?.[formatDateKey(check)]) {
+          found = true;
+          break;
+        }
+      }
+      if (!found) {
+        return getDaysBetween(d, today);
+      }
+      break;
+    }
+    return 0;
+  })();
   const { user } = useUser();
   const [resetToTodayFn, setResetToTodayFn] = useState<(() => void) | null>(
     null,
@@ -606,37 +690,48 @@ export default function Dashboard() {
       : "there";
 
   // =========================================================
-  // THE NEW, PERFECTLY SYNCED PHASE LOGIC
+  // PHASE + CYCLE-DAY — single source of truth: periodDates & predictedDates
+  //
+  // Rule: if a date is not highlighted red in the Calendar it is NEVER
+  // "Menstrual" on the Dashboard.  No independent math can override the store.
   // =========================================================
   const targetKey = formatDateKey(footerDate);
 
-  // 1. Explicitly check the store to see if this is a real or predicted period day
+  // ── Step 1: Is today (or the dialled-to date) actually a period day? ──────
+  // These are the *exact* same maps MonthItem in calendar.tsx checks.
   const isLoggedPeriodDay = Boolean(periodDates?.[targetKey]);
-  const isPredictedPeriodDay = Boolean(predictedDates?.[targetKey]);
-  const isExplicitMenstrual = isLoggedPeriodDay || isPredictedPeriodDay;
-  const isMissed =
-    typeof isDateInMissedPredictedWindow === "function"
-      ? isDateInMissedPredictedWindow(footerDate)
-      : false;
+  const isPredictedPeriodDay =
+    Boolean(predictedDates?.[targetKey]) && !isLoggedPeriodDay;
 
-  // 2. Find the closest actual anchor period start
+  // ── Step 2: Locate the most-recent run start at-or-before footerDate ──────
+  // Walk backward through the *run* that contains the last logged day ≤ target.
+  // This gives us the true cycle anchor (day 1) without adding any days.
   const loggedKeys = Object.keys(periodDates || {}).sort();
   const pastLogged = loggedKeys.filter((k) => k <= targetKey);
   let anchorDate: Date | null = null;
 
   if (pastLogged.length > 0) {
-    let lastDay = pastLogged[pastLogged.length - 1];
-    let d = parseDateKey(lastDay);
+    // Start from the most-recent logged day ≤ target and walk back to the
+    // start of that contiguous run (gap-tolerant: treat gaps ≤ 2 d as same run).
+    let d = parseDateKey(pastLogged[pastLogged.length - 1]);
     while (true) {
-      const prev = new Date(d);
-      prev.setDate(prev.getDate() - 1);
-      if (periodDates?.[formatDateKey(prev)]) d = prev;
-      else break;
+      const prev = new Date(d.getFullYear(), d.getMonth(), d.getDate() - 1);
+      const prev2 = new Date(d.getFullYear(), d.getMonth(), d.getDate() - 2);
+      if (periodDates?.[formatDateKey(prev)]) {
+        d = prev;
+      } else if (periodDates?.[formatDateKey(prev2)]) {
+        // gap of 1 missing day — still the same run
+        d = prev2;
+      } else {
+        break;
+      }
     }
     anchorDate = d;
   }
 
-  // 3. Jump to future predicted anchors if scrolling forward
+  // ── Step 3: Prefer a predicted start if it falls between anchor and target ─
+  // This keeps "DAY X of cycle" counting correctly when scrolling into the
+  // future past a predicted period start.
   if (predictedStarts && predictedStarts.length > 0) {
     const pastPredicted = [...predictedStarts]
       .sort()
@@ -651,50 +746,53 @@ export default function Dashboard() {
     }
   }
 
-  // 4. Calculate the real Cycle Day
+  // ── Step 4: Cycle day (1-based, relative to the anchor) ───────────────────
+  // If there is no anchor at all we cannot know the cycle day — show 1.
   let cycleDay = 1;
   if (anchorDate) {
-    if (footerDate.getTime() >= anchorDate.getTime()) {
-      cycleDay = getDaysBetween(anchorDate, footerDate) + 1;
-    } else {
-      const diff = getDaysBetween(anchorDate, footerDate);
-      const remainder = diff % cycleLength;
-      cycleDay = remainder === 0 ? 1 : cycleLength + remainder + 1;
-    }
+    const raw = getDaysBetween(anchorDate, footerDate);
+    // raw is always ≥ 0 here because anchorDate ≤ footerDate by construction
+    cycleDay = Math.max(1, raw + 1);
   }
 
-  // 5. Determine the Phase matching the calendar exactly
-  // 5. Determine the Phase matching the calendar exactly
-  let phaseKey: PhaseKey = "luteal";
+  // ── Step 5: Phase — calendar-locked, no independent menstrual math ─────────
+  //
+  // MENSTRUAL:   ONLY if the date is in periodDates (logged) OR predictedDates
+  //              (i.e. the Calendar would colour it red).  Never from cycleDay math.
+  //
+  // FOLLICULAR / OVULATION / LUTEAL: estimated from cycleDay, but these
+  //              estimators can NEVER produce "menstrual" — that gate is closed.
+  let phaseKey: PhaseKey;
 
-  // IF IT IS LOGGED OR PREDICTED, IT IS MENSTRUAL. PERIOD.
   if (isLoggedPeriodDay || isPredictedPeriodDay) {
+    // Calendar shows it red → Dashboard says Menstrual.
     phaseKey = "menstrual";
-  }
-  // ONLY USE APPROXIMATION MATH IF IT IS NOT A PERIOD DAY
-  else {
-    // We only use the estimation math for Follicular/Ovulation/Luteal
-    const menstrualEnd = Math.max(4, Math.round(cycleLength * 0.18));
-    const follicularEnd = Math.max(
-      menstrualEnd + 1,
-      Math.round(cycleLength * 0.46),
-    );
+  } else if (!anchorDate) {
+    // No period data at all — default to luteal (neutral, no assumption).
+    phaseKey = "luteal";
+  } else {
+    // Non-period day: estimate follicular / ovulation / luteal from cycleDay.
+    // The menstrual branch is intentionally absent here — cycleDay alone cannot
+    // promote a day to "menstrual" if the Calendar doesn't show it red.
+    const follicularEnd = Math.max(6, Math.round(cycleLength * 0.46));
     const ovulationEnd = Math.max(
       follicularEnd + 1,
       Math.round(cycleLength * 0.61),
     );
 
-    if (cycleDay <= menstrualEnd)
-      phaseKey = "menstrual"; // Safety fallback
-    else if (cycleDay <= follicularEnd) phaseKey = "follicular";
+    if (cycleDay <= follicularEnd) phaseKey = "follicular";
     else if (cycleDay <= ovulationEnd) phaseKey = "ovulation";
-    else if (isMissed)
-      phaseKey = "luteal"; // Missed windows are only considered if not menstrual
     else phaseKey = "luteal";
   }
 
   const phase = PHASES[phaseKey];
-  const daysUntilPeriod = cycleLength - cycleDay + 1;
+
+  // "Your period is in X days" — use the next predicted start if available,
+  // otherwise fall back to a cycleLength estimate.
+  const nextPredictedKey = predictedStarts?.find((k: string) => k > targetKey);
+  const daysUntilPeriod = nextPredictedKey
+    ? Math.max(1, getDaysBetween(footerDate, parseDateKey(nextPredictedKey)))
+    : Math.max(1, cycleLength - cycleDay + 1);
 
   // =========================================================
 
@@ -771,6 +869,8 @@ export default function Dashboard() {
           activeDay={activeDay}
           moonColor={phase.moonColor}
           onProvideReset={handleProvideReset}
+          periodDates={periodDates}
+          predictedDates={predictedDates}
         />
       </View>
 
@@ -1000,6 +1100,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "transparent",
   },
+  dayNumberCirclePeriod: {
+    backgroundColor: "transparent",
+    borderWidth: 0.6,
+    borderColor: "rgba(255,255,255,0.10)",
+  },
   dayNumberCircleActive: {
     backgroundColor: "transparent",
     borderWidth: 0.3,
@@ -1009,6 +1114,10 @@ const styles = StyleSheet.create({
     color: "white",
     fontSize: 18,
     fontFamily: "Georgia",
+  },
+  dayNumberTextPeriod: {
+    color: "white",
+    fontWeight: "700",
   },
   bottomInfo: {
     position: "relative",

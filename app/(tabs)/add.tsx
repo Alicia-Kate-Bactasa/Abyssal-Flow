@@ -10,33 +10,95 @@ import {
 import { useRouter } from "expo-router";
 import { useCycleData } from "@/hooks/use-cycle-store";
 
+// Validate that a string is a real YYYY-MM-DD calendar date.
+function parseIsoDate(raw: string): Date | null {
+  const trimmed = raw.trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return null;
+  const [y, m, d] = trimmed.split("-").map(Number);
+  // Use local-time constructor — avoids UTC-midnight timezone shift.
+  const dt = new Date(y, m - 1, d);
+  if (dt.getFullYear() !== y || dt.getMonth() !== m - 1 || dt.getDate() !== d) {
+    return null; // e.g. Feb 30
+  }
+  return dt;
+}
+
 export default function AddCycleScreen() {
   const router = useRouter();
-  const { logNewCycle } = useCycleData();
+  const { logNewCycle, periodDates } = useCycleData();
 
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
   const [saving, setSaving] = useState(false);
 
   const markToday = () => {
-    const iso = new Date().toISOString().slice(0, 10);
+    const today = new Date();
+    const iso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
     setStart(iso);
     setEnd(iso);
   };
 
   const handleSubmit = async () => {
-    if (!start) {
-      Alert.alert("Please enter a start date (YYYY-MM-DD) or tap Today");
+    // ── Validate start ──────────────────────────────────────────────────────
+    const startDate = parseIsoDate(start);
+    if (!startDate) {
+      Alert.alert(
+        "Invalid start date",
+        "Enter a date in YYYY-MM-DD format, e.g. 2026-05-01",
+      );
       return;
     }
-    setSaving(true);
-    try {
-      await logNewCycle(start, end || start);
-      router.back();
-    } catch (err) {
-      Alert.alert("Save failed", "Could not save cycle. Try again.");
-    } finally {
-      setSaving(false);
+
+    // ── Validate end (optional) ────────────────────────────────────────────
+    let endDate: Date = startDate;
+    if (end.trim()) {
+      const parsed = parseIsoDate(end);
+      if (!parsed) {
+        Alert.alert(
+          "Invalid end date",
+          "Enter a date in YYYY-MM-DD format, e.g. 2026-05-05",
+        );
+        return;
+      }
+      if (parsed.getTime() < startDate.getTime()) {
+        Alert.alert(
+          "Invalid range",
+          "End date must be on or after start date.",
+        );
+        return;
+      }
+      endDate = parsed;
+    }
+
+    // ── Warn if existing data will be replaced ─────────────────────────────
+    // logNewCycle deletes all previous rows before inserting the new one,
+    // so we give the user a heads-up when there is already data in the store.
+    const hasExisting = Object.keys(periodDates).length > 0;
+
+    const doSave = async () => {
+      setSaving(true);
+      try {
+        // Pass Date objects so logNewCycle's local-time toIso helper is used.
+        await logNewCycle(startDate, endDate);
+        router.back();
+      } catch {
+        Alert.alert("Save failed", "Could not save cycle. Please try again.");
+      } finally {
+        setSaving(false);
+      }
+    };
+
+    if (hasExisting) {
+      Alert.alert(
+        "Replace existing cycle?",
+        "Saving will remove your previously logged dates and replace them with this new range.",
+        [
+          { text: "Cancel", style: "cancel" },
+          { text: "Replace", style: "destructive", onPress: doSave },
+        ],
+      );
+    } else {
+      await doSave();
     }
   };
 
@@ -51,6 +113,7 @@ export default function AddCycleScreen() {
         onChangeText={setStart}
         placeholder="2026-04-12"
         placeholderTextColor="rgba(255,255,255,0.4)"
+        keyboardType="numeric"
       />
 
       <Text style={styles.label}>End date (optional)</Text>
@@ -60,6 +123,7 @@ export default function AddCycleScreen() {
         onChangeText={setEnd}
         placeholder="2026-04-14"
         placeholderTextColor="rgba(255,255,255,0.4)"
+        keyboardType="numeric"
       />
 
       <View style={styles.row}>
