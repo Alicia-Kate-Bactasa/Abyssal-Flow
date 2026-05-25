@@ -10,13 +10,6 @@ import React, {
 } from "react";
 import { loadCycleSnapshot, saveCycleSnapshot } from "../lib/cycle-sync";
 
-// ✅ FIXED: Explicitly declare internal snapshot map shape to resolve TypeScript compilation blocks
-type DayRecord = {
-  period?: boolean;
-  moods?: string[];
-  symptoms?: string[];
-};
-
 export type LogEntry = {
   moods: string[];
   symptoms: string[];
@@ -42,7 +35,7 @@ type CycleDataContextValue = {
   logs: Record<string, LogEntry>;
   profile: CycleProfile;
   togglePeriodDate: (date: Date) => void;
-  replacePeriodDates: (dateKeys: string[]) => void;
+  replacePeriodDates: (newDates: Record<string, true>) => Promise<void>;
   setPeriodDatesForMonth: (year: number, month: number, days: number[]) => void;
   recalcPredictions: (dates?: Record<string, true>) => void;
   logMoodSymptoms: (date: Date, moods: string[], symptoms: string[]) => void;
@@ -70,14 +63,13 @@ type CycleDataContextValue = {
   missedPredictedStarts: Record<string, true>;
   isDateInMissedPredictedWindow: (date: Date) => boolean;
   resetStore: () => void;
-  fetchRemoteCycles: (overrideNext?: Record<string, true>) => Promise<void>;
+  fetchRemoteCycles: () => Promise<void>;
   logNewCycle: (
     startDate: string | Date,
     endDate?: string | Date,
   ) => Promise<void>;
   daysLate: number;
   predictionStatus: string;
-  getRecalcTiming: () => { lastMs: number; maxMs: number; lastAt: number } | null;
 };
 
 const CycleDataContext = createContext<CycleDataContextValue | null>(null);
@@ -87,18 +79,9 @@ const pad2 = (value: number) => String(value).padStart(2, "0");
 export const formatDateKey = (date: Date) =>
   `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
 
-const toLocalDate = (key: string) => {
-  const date = new Date(`${key}T00:00:00`);
-  date.setHours(0, 0, 0, 0);
-  return date;
-};
-
-export const parseDateKey = (key: string) => toLocalDate(key);
-
-const normalizeDate = (date: Date) => {
-  const next = new Date(date.getTime());
-  next.setHours(0, 0, 0, 0);
-  return next;
+export const parseDateKey = (key: string) => {
+  const [year, month, day] = key.split("-").map((part) => Number(part));
+  return new Date(year, month - 1, day);
 };
 
 const isSameMonth = (date: Date, year: number, month: number) =>
@@ -109,24 +92,10 @@ const sortDateKeys = (keys: string[]) =>
     (a, b) => parseDateKey(a).getTime() - parseDateKey(b).getTime(),
   );
 
-const hashDateKeys = (keys: string[]) => {
-  const sorted = [...keys].sort();
-  let hash = 2166136261;
-  for (const key of sorted) {
-    for (let i = 0; i < key.length; i += 1) {
-      hash ^= key.charCodeAt(i);
-      hash += (hash << 1) + (hash << 4) + (hash << 7) + (hash << 8) + (hash << 24);
-    }
-    hash ^= 1247;
-  }
-  return `k${hash >>> 0}`;
-};
-
 export const buildPeriodRuns = (keys: string[]) => {
   const sorted = sortDateKeys(keys);
   const runs: string[][] = [];
   let current: string[] = [];
-  const MAX_WITHIN_PERIOD_GAP = 2;
 
   for (const key of sorted) {
     if (!current.length) {
@@ -135,9 +104,8 @@ export const buildPeriodRuns = (keys: string[]) => {
     }
     const prev = parseDateKey(current[current.length - 1]);
     const next = parseDateKey(key);
-    const diff = Math.round((next.getTime() - prev.getTime()) / (1000 * 60 * 60 * 24));
-    
-    if (diff <= MAX_WITHIN_PERIOD_GAP) {
+    const diff = (next.getTime() - prev.getTime()) / (1000 * 60 * 60 * 24);
+    if (diff === 1) {
       current.push(key);
     } else {
       runs.push(current);
@@ -151,21 +119,19 @@ export const buildPeriodRuns = (keys: string[]) => {
 const defaultCycleLength = 28;
 const defaultPeriodLength = 5;
 
-const isValidCycleInterval = (days: number) => days >= 21 && days <= 45;
+const isValidCycleInterval = (days: number) => days >= 21 && days <= 35;
 
 const average = (values: number[]) =>
-  Math.round(values.reduce((sum, value) => sum + value, 0) / values.length || 0);
+  Math.round(values.reduce((sum, value) => sum + value, 0) / values.length);
 
 const calculateCycleLength = (starts: Date[], baseLength: number) => {
   if (starts.length < 2) return baseLength;
 
-  const sortedStarts = [...starts].sort((a, b) => a.getTime() - b.getTime());
-
-  const intervals = sortedStarts
+  const intervals = starts
     .slice(1)
     .map((date, idx) =>
       Math.round(
-        (date.getTime() - sortedStarts[idx].getTime()) / (1000 * 60 * 60 * 24),
+        (date.getTime() - starts[idx].getTime()) / (1000 * 60 * 60 * 24),
       ),
     )
     .filter((days) => days > 0);
@@ -173,11 +139,11 @@ const calculateCycleLength = (starts: Date[], baseLength: number) => {
   const validIntervals = intervals.filter(isValidCycleInterval);
   if (!validIntervals.length) return baseLength;
 
-  if (sortedStarts.length === 2) {
+  if (starts.length === 2) {
     return average([baseLength, validIntervals[0]]);
   }
 
-  if (sortedStarts.length === 3) {
+  if (starts.length === 3) {
     return average([baseLength, ...validIntervals.slice(0, 2)]);
   }
 
@@ -218,28 +184,29 @@ const defaultProfile: CycleProfile = {
 
 export function CycleDataProvider({ children }: { children: React.ReactNode }) {
   const [periodDates, setPeriodDates] = useState<Record<string, true>>({});
-  const [predictedDates, setPredictedDates] = useState<Record<string, true>>({});
+  const [predictedDates, setPredictedDates] = useState<Record<string, true>>(
+    {},
+  );
   const [logs, setLogs] = useState<Record<string, LogEntry>>({});
   const [profile, setProfile] = useState<CycleProfile>(defaultProfile);
   const [hydrated, setHydrated] = useState(false);
   const [daysLate, setDaysLate] = useState<number>(0);
   const [predictionStatus, setPredictionStatus] = useState<string>("");
   const [predictedStarts, setPredictedStarts] = useState<string[]>([]);
-  const [missedPredictedStarts, setMissedPredictedStarts] = useState<Record<string, true>>({});
-  const [selectedLogDate, setSelectedLogDateState] = useState<Date | null>(null);
+  const [missedPredictedStarts, setMissedPredictedStarts] = useState<
+    Record<string, true>
+  >({});
+  const [selectedLogDate, setSelectedLogDateState] = useState<Date | null>(
+    null,
+  );
   const [logModalRequestCount, setLogModalRequestCount] = useState(0);
-  const recalcPerfRef = useRef({ lastMs: 0, maxMs: 0, lastAt: 0 });
-  const recalcCacheRef = useRef<{
-    keysHash: string;
-    profileKey: string;
-    runs: string[][];
-    starts: Date[];
-    targetCycleLength: number;
-    avgPeriodLength: number;
-    isIrregular: boolean;
-    isModeratelyIrregular: boolean;
-    selfReportedIrregular: boolean;
-  } | null>(null);
+
+  // ─── Write-lock: blocks fetchRemoteCycles while a save is in-flight ────────
+  // When replacePeriodDates starts, it sets this to true. fetchRemoteCycles
+  // will bail out immediately if it finds this true, preventing it from
+  // pulling stale (pre-upsert) data from Supabase and wiping local state.
+  // The lock is released only after the Supabase upsert settles.
+  const saveInFlightRef = useRef(false);
 
   const resetStore = useCallback(() => {
     setPeriodDates({});
@@ -258,7 +225,8 @@ export function CycleDataProvider({ children }: { children: React.ReactNode }) {
       setSelectedLogDateState((prev) => (prev === null ? prev : null));
       return;
     }
-    const copy = normalizeDate(d);
+    const copy = new Date(d);
+    copy.setHours(0, 0, 0, 0);
     setSelectedLogDateState((prev) => {
       if (prev && formatDateKey(prev) === formatDateKey(copy)) {
         return prev;
@@ -271,105 +239,71 @@ export function CycleDataProvider({ children }: { children: React.ReactNode }) {
     () => (selectedLogDate ? new Date(selectedLogDate) : null),
     [selectedLogDate],
   );
-  
   const requestLogModal = useCallback(() => {
     setLogModalRequestCount((count) => count + 1);
   }, []);
 
-  // ── recalcPredictions ────────────────────────────────────────────────────
+  useEffect(() => {
+    (async () => {
+      try {
+        const snapshot = await loadCycleSnapshot();
+        if (snapshot.profile)
+          setProfile((prev) => ({ ...prev, ...snapshot.profile }));
+        // NOTE: We intentionally do NOT restore periodDates from the
+        // cycle-sync snapshot here. Period dates are the source of truth in
+        // period_cycles and are loaded via fetchRemoteCycles below.
+        if (snapshot.logs) setLogs(snapshot.logs);
+      } catch {
+        // ignore
+      } finally {
+        setHydrated(true);
+      }
+    })();
+  }, []);
+
   const recalcPredictions = useCallback(
     (dates?: Record<string, true>) => {
-      const t0 = globalThis.performance?.now?.() ?? Date.now();
       const activeDates = dates ?? periodDates;
       const periodKeys = Object.keys(activeDates);
-      const keysHash = hashDateKeys(periodKeys);
-      const profileKey = `${profile.cycleLength || defaultCycleLength}|${profile.cycleRegularity ?? ""}`;
-      const canReuse =
-        !!recalcCacheRef.current &&
-        recalcCacheRef.current.keysHash === keysHash &&
-        recalcCacheRef.current.profileKey === profileKey;
-
-      let runs: string[][] = [];
-      let starts: Date[] = [];
-      let targetCycleLength = profile.cycleLength || defaultCycleLength;
-      let avgPeriodLength = defaultPeriodLength;
-      let isIrregular = false;
-      let isModeratelyIrregular = false;
-      let selfReportedIrregular = false;
-
-      if (canReuse) {
-        runs = recalcCacheRef.current?.runs ?? [];
-        starts = recalcCacheRef.current?.starts ?? [];
-        targetCycleLength = recalcCacheRef.current?.targetCycleLength ?? targetCycleLength;
-        avgPeriodLength = recalcCacheRef.current?.avgPeriodLength ?? avgPeriodLength;
-        isIrregular = !!recalcCacheRef.current?.isIrregular;
-        isModeratelyIrregular = !!recalcCacheRef.current?.isModeratelyIrregular;
-        selfReportedIrregular = !!recalcCacheRef.current?.selfReportedIrregular;
-      } else {
-        runs = buildPeriodRuns(periodKeys);
-        starts = runs
-          .map((run) => parseDateKey(run[0]))
-          .sort((a, b) => a.getTime() - b.getTime());
-
-        const baseCycleLength = profile.cycleLength || defaultCycleLength;
-        const diffs = getIntervalsFromStarts(starts);
-        const validDiffs = diffs.filter(isValidCycleInterval);
-        targetCycleLength = calculateCycleLength(starts, baseCycleLength);
-
-        if (runs.length) {
-          avgPeriodLength = Math.round(
-            runs.reduce((sum, run) => sum + run.length, 0) / runs.length,
-          );
-        }
-
-        const stdDev = calculateStdDev(
-          validDiffs.slice(-6),
-          validDiffs.length ? average(validDiffs.slice(-6)) : targetCycleLength,
-        );
-        isIrregular = stdDev >= 7;
-        isModeratelyIrregular = stdDev > 3 && stdDev < 7;
-
-        selfReportedIrregular =
-          !!profile.cycleRegularity &&
-          (profile.cycleRegularity.toLowerCase() === "irregular" ||
-            profile.cycleRegularity.toLowerCase() === "unsure");
-        if (selfReportedIrregular) isIrregular = true;
-
-        recalcCacheRef.current = {
-          keysHash,
-          profileKey,
-          runs,
-          starts,
-          targetCycleLength,
-          avgPeriodLength,
-          isIrregular,
-          isModeratelyIrregular,
-          selfReportedIrregular,
-        };
-      }
+      const runs = buildPeriodRuns(periodKeys);
+      const starts = runs.map((run) => parseDateKey(run[0]));
 
       if (!starts.length) {
         setPredictedDates({});
         setPredictedStarts([]);
-        const t1 = globalThis.performance?.now?.() ?? Date.now();
-        const elapsed = t1 - t0;
-        recalcPerfRef.current.lastMs = elapsed;
-        recalcPerfRef.current.maxMs = Math.max(recalcPerfRef.current.maxMs, elapsed);
-        recalcPerfRef.current.lastAt = Date.now();
-        if (__DEV__ && elapsed > 2) {
-          console.warn(`recalcPredictions exceeded 2ms budget: ${elapsed.toFixed(2)}ms`);
-        }
         return;
       }
+
+      const baseCycleLength = profile.cycleLength || defaultCycleLength;
+      const diffs = getIntervalsFromStarts(starts);
+      const validDiffs = diffs.filter(isValidCycleInterval);
+      const targetCycleLength = calculateCycleLength(starts, baseCycleLength);
+
+      let avgPeriodLength = defaultPeriodLength;
+      if (runs.length) {
+        avgPeriodLength = Math.round(
+          runs.reduce((sum, run) => sum + run.length, 0) / runs.length,
+        );
+      }
+
+      const stdDev = calculateStdDev(
+        validDiffs.slice(-6),
+        validDiffs.length ? average(validDiffs.slice(-6)) : targetCycleLength,
+      );
+      let isIrregular = stdDev >= 7;
+      const isModeratelyIrregular = stdDev > 3 && stdDev < 7;
+
+      const selfReportedIrregular =
+        !!profile.cycleRegularity &&
+        (profile.cycleRegularity.toLowerCase() === "irregular" ||
+          profile.cycleRegularity.toLowerCase() === "unsure");
+      if (selfReportedIrregular) isIrregular = true;
 
       const lastStart = starts[starts.length - 1];
       const nextPredictions: Record<string, true> = {};
       const nextPredictedStarts: string[] = [];
-      
-      const totalCyclesToProject = 18; 
-      
-      const cursor = normalizeDate(lastStart);
-      const scratch = new Date(cursor.getTime());
+      const monthsAhead = 18;
+      let cursor = new Date(lastStart);
 
       const windowSize = isIrregular
         ? 7
@@ -377,211 +311,235 @@ export function CycleDataProvider({ children }: { children: React.ReactNode }) {
           ? 5
           : 1;
 
-      for (let i = 0; i < totalCyclesToProject; i++) {
-        cursor.setDate(cursor.getDate() + targetCycleLength);
-        const startKey = formatDateKey(cursor);
-        nextPredictedStarts.push(startKey);
+      for (let i = 0; i < monthsAhead; i += 1) {
+        cursor = new Date(
+          cursor.getFullYear(),
+          cursor.getMonth(),
+          cursor.getDate() + targetCycleLength,
+        );
+
+        nextPredictedStarts.push(formatDateKey(cursor));
 
         if (windowSize <= 1) {
           for (let day = 0; day < avgPeriodLength; day += 1) {
-            scratch.setTime(cursor.getTime());
-            scratch.setDate(cursor.getDate() + day);
-            nextPredictions[formatDateKey(scratch)] = true;
+            const predicted = new Date(
+              cursor.getFullYear(),
+              cursor.getMonth(),
+              cursor.getDate() + day,
+            );
+            nextPredictions[formatDateKey(predicted)] = true;
           }
         } else {
           const half = Math.floor((windowSize - 1) / 2);
           for (let offset = -half; offset <= half; offset += 1) {
             for (let day = 0; day < avgPeriodLength; day += 1) {
-              scratch.setTime(cursor.getTime());
-              scratch.setDate(cursor.getDate() + offset + day);
-              nextPredictions[formatDateKey(scratch)] = true;
+              const predicted = new Date(
+                cursor.getFullYear(),
+                cursor.getMonth(),
+                cursor.getDate() + offset + day,
+              );
+              nextPredictions[formatDateKey(predicted)] = true;
             }
           }
         }
       }
       setPredictedDates(nextPredictions);
       setPredictedStarts(nextPredictedStarts);
-      const t1 = globalThis.performance?.now?.() ?? Date.now();
-      const elapsed = t1 - t0;
-      recalcPerfRef.current.lastMs = elapsed;
-      recalcPerfRef.current.maxMs = Math.max(recalcPerfRef.current.maxMs, elapsed);
-      recalcPerfRef.current.lastAt = Date.now();
-      if (__DEV__ && elapsed > 2) {
-        console.warn(`recalcPredictions exceeded 2ms budget: ${elapsed.toFixed(2)}ms`);
-      }
     },
-    [profile.cycleLength, profile.cycleRegularity, periodDates],
+    [
+      periodDates,
+      profile.cycleLength,
+      profile.cycleRegularity,
+      profile.medications,
+    ],
   );
 
-  async function logNewCycle(startDate: string | Date, endDate?: string | Date) {
-    try {
-      const { data: { user } } = await supabaseClient.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
+  // ─── replacePeriodDates ─────────────────────────────────────────────────────
+  // Single source of truth for all period-date mutations that need cloud sync.
+  // Acquires saveInFlightRef before any async work so fetchRemoteCycles
+  // cannot race and overwrite state while the upsert is pending.
+  const replacePeriodDates = useCallback(
+    async (newDates: Record<string, true>) => {
+      // 1. Acquire write-lock BEFORE touching any state.
+      saveInFlightRef.current = true;
 
-      const toIso = (d: string | Date) => {
-        if (typeof d === "string") return d.trim().split("T")[0];
-        return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
-      };
+      // 2. Optimistic local update so the UI reflects changes immediately.
+      setPeriodDates(newDates);
+      recalcPredictions(newDates);
 
-      const startIso = toIso(startDate);
-      const endIso = endDate ? toIso(endDate) : startIso;
-
-      const { error: deleteError } = await supabaseClient
-        .from("period_cycles")
-        .delete()
-        .eq("user_id", user.id);
-      if (deleteError) throw deleteError;
-
-      const { error: insertError } = await supabaseClient
-        .from("period_cycles")
-        .insert([{ user_id: user.id, start_date: startIso, end_date: endIso }]);
-      if (insertError) throw insertError;
-
-      const next: Record<string, true> = {};
-      const rangeStart = toLocalDate(startIso);
-      const rangeEnd = toLocalDate(endIso);
-      const cursor = new Date(rangeStart.getTime());
-      for (; cursor.getTime() <= rangeEnd.getTime(); cursor.setDate(cursor.getDate() + 1)) {
-        next[formatDateKey(cursor)] = true;
-      }
-
-      setPeriodDates(next);
-      recalcPredictions(next);
-      
-      saveCycleSnapshot(next, logs).catch(() => {});
-
-      fetchRemoteCycles(next).catch((err) =>
-        console.error("logNewCycle: background sync error:", err),
-      );
-    } catch (err) {
-      console.error("Failed to log new cycle:", err);
-      throw err;
-    }
-  }
-
-  // ── fetchRemoteCycles ─────────────────────────────────────────────────────
-  const fetchRemoteCycles = useCallback(
-    async (overrideNext?: Record<string, true>) => {
       try {
-        const { data: { user } } = await supabaseClient.auth.getUser();
-        if (!user) {
-          setPeriodDates({});
-          setPredictedDates({});
-          return;
-        }
+        const {
+          data: { user },
+        } = await supabaseClient.auth.getUser();
+        if (!user) return;
 
-        let next: Record<string, true> = {};
+        // 3. Group individual dates into contiguous runs for storage.
+        const keys = Object.keys(newDates);
+        const runs = buildPeriodRuns(keys);
 
-        if (overrideNext) {
-          next = overrideNext;
-        } else {
-          const { data: cyclesData, error: cyclesError } = await supabaseClient
-            .from("period_cycles")
-            .select("start_date,end_date")
-            .eq("user_id", user.id);
+        const rowsToInsert = runs.map((run) => ({
+          user_id: user.id,
+          start_date: run[0],
+          end_date: run[run.length - 1],
+          source: "manual",
+        }));
 
-          if (cyclesError) {
-            console.error("Failed to load period_cycles:", cyclesError.message);
-          } else {
-            (cyclesData || []).forEach((row: any) => {
-              const start = toLocalDate(row.start_date);
-              const end = toLocalDate(row.end_date);
-              const cursor = new Date(start.getTime());
-              for (; cursor.getTime() <= end.getTime(); cursor.setDate(cursor.getDate() + 1)) {
-                next[formatDateKey(cursor)] = true;
-              }
-            });
-          }
-        }
-
-        const { data: logsData, error: logsError } = await supabaseClient
-          .from("period_logs")
-          .select("log_date,source,notes")
+        // 4. Delete-then-upsert is the safest replace pattern for Supabase.
+        //    We await each step so we never release the lock on a partial write.
+        await supabaseClient
+          .from("period_cycles")
+          .delete()
           .eq("user_id", user.id);
 
-        if (logsError) {
-          console.error("Failed to load period_logs for calendar sync:", logsError.message);
-        } else {
-          const fetchedLogs: Record<string, LogEntry> = {};
-          
-          (logsData || []).forEach((row: any) => {
-            const decoded = row.notes ? (row.notes as DayRecord) : null;
-            
-            if (decoded) {
-              if (decoded.period) {
-                next[row.log_date] = true;
-              }
-              if ((decoded.moods?.length) || (decoded.symptoms?.length)) {
-                fetchedLogs[row.log_date] = {
-                  moods: decoded.moods ?? [],
-                  symptoms: decoded.symptoms ?? [],
-                };
-              }
-            } else if (row.source) {
-              next[row.log_date] = true;
-            }
-          });
-
-          setLogs((prev) => ({ ...prev, ...fetchedLogs }));
+        if (rowsToInsert.length > 0) {
+          await supabaseClient.from("period_cycles").upsert(rowsToInsert);
         }
-
-        setPeriodDates(next);
-        recalcPredictions(next);
       } catch (err) {
-        console.error("Error running remote cycle hydration loop:", err);
-        setPeriodDates({});
-        setPredictedDates({});
+        console.error("Cloud sync failed:", err);
+        // State is already updated optimistically — don't revert so the user
+        // doesn't see a confusing flash. The next fetchRemoteCycles (e.g. on
+        // next app open) will reconcile if the write partially failed.
+      } finally {
+        // 5. Release write-lock only after the Supabase round-trip finishes.
+        saveInFlightRef.current = false;
       }
     },
     [recalcPredictions],
   );
 
-  // Load disk cache state on startup
-  useEffect(() => {
-    (async () => {
+  // ─── logNewCycle ────────────────────────────────────────────────────────────
+  const logNewCycle = useCallback(
+    async (startDate: string | Date, endDate?: string | Date) => {
       try {
-        const snapshot = await loadCycleSnapshot();
-        if (snapshot.periodDates) setPeriodDates(snapshot.periodDates);
-        if (snapshot.logs) setLogs(snapshot.logs);
-        if (snapshot.profile)
-          setProfile((prev) => ({ ...prev, ...snapshot.profile }));
-      } catch {
-        // fall back
-      } finally {
-        setHydrated(true);
-      }
-    })();
-  }, []);
+        const toIso = (d: string | Date) => {
+          const dt = typeof d === "string" ? new Date(d + "T00:00:00") : d;
+          dt.setHours(0, 0, 0, 0);
+          return `${dt.getFullYear()}-${pad2(dt.getMonth() + 1)}-${pad2(dt.getDate())}`;
+        };
 
-  // Sync server cycles once hydration completes
+        const startIso = toIso(startDate);
+        const endIso = endDate ? toIso(endDate) : startIso;
+
+        const next: Record<string, true> = { ...periodDates };
+        const rangeStart = new Date(startIso + "T00:00:00");
+        const rangeEnd = new Date(endIso + "T00:00:00");
+
+        for (
+          let d = new Date(rangeStart);
+          d.getTime() <= rangeEnd.getTime();
+          d.setDate(d.getDate() + 1)
+        ) {
+          next[formatDateKey(new Date(d))] = true;
+        }
+
+        await replacePeriodDates(next);
+      } catch (err) {
+        console.error("Failed to log new cycle:", err);
+        throw err;
+      }
+    },
+    [periodDates, replacePeriodDates],
+  );
+
+  // ─── fetchRemoteCycles ──────────────────────────────────────────────────────
+  // Guarded by BOTH an in-flight lock (fetchInFlightRef) and the write-lock
+  // (saveInFlightRef). If a save is happening, bail immediately — the local
+  // state is already correct and the cloud will catch up on the next fetch.
+  const fetchInFlightRef = useRef(false);
+
+  const fetchRemoteCycles = useCallback(async () => {
+    // Hard bail if a save is in progress — local state is the truth right now.
+    if (saveInFlightRef.current) return;
+    if (fetchInFlightRef.current) return;
+
+    fetchInFlightRef.current = true;
+    try {
+      const {
+        data: { user },
+      } = await supabaseClient.auth.getUser();
+
+      if (!user) return;
+
+      const { data, error } = await supabaseClient
+        .from("period_cycles")
+        .select("start_date,end_date")
+        .eq("user_id", user.id);
+
+      if (error) {
+        console.error("Failed to load period_cycles:", error);
+        return;
+      }
+
+      // One final check: if a save started while we were awaiting, discard
+      // the remote result — it may predate the in-flight upsert.
+      if (saveInFlightRef.current) return;
+
+      const next: Record<string, true> = {};
+      (data || []).forEach((row: any) => {
+        const [sy, sm, sd] = (row.start_date as string).split("-").map(Number);
+        const [ey, em, ed] = (row.end_date as string).split("-").map(Number);
+        const start = new Date(sy, sm - 1, sd);
+        const end = new Date(ey, em - 1, ed);
+        for (
+          let d = new Date(start);
+          d.getTime() <= end.getTime();
+          d.setDate(d.getDate() + 1)
+        ) {
+          next[formatDateKey(new Date(d))] = true;
+        }
+      });
+
+      setPeriodDates(next);
+      recalcPredictions(next);
+    } catch (err) {
+      console.error("Error fetching period cycles:", err);
+    } finally {
+      fetchInFlightRef.current = false;
+    }
+  }, [recalcPredictions]);
+
+  const initialFetchDoneRef = useRef(false);
   useEffect(() => {
     if (!hydrated) return;
-    fetchRemoteCycles().catch(() => {});
+    if (initialFetchDoneRef.current) return;
+    initialFetchDoneRef.current = true;
+    fetchRemoteCycles().catch(() => {
+      initialFetchDoneRef.current = false;
+    });
   }, [hydrated, fetchRemoteCycles]);
+
+  // ─── Persist logs (NOT periodDates) to cycle-sync on change ────────────────
+  // We only sync logs here — period dates are managed exclusively via
+  // period_cycles / replacePeriodDates to avoid the two-table conflict that
+  // caused the original amnesia bug.
+  useEffect(() => {
+    if (!hydrated) return;
+    (async () => {
+      try {
+        // Pass empty periodDates so saveCycleSnapshot touches only
+        // the logs columns, not period_logs rows.
+        await saveCycleSnapshot({}, logs);
+      } catch {
+        // ignore
+      }
+    })();
+  }, [hydrated, logs]);
 
   const togglePeriodDate = useCallback((date: Date) => {
     const key = formatDateKey(date);
     setPeriodDates((prev) => {
-      const next = { ...prev };
-      if (next[key]) {
+      if (prev[key]) {
+        const next = { ...prev };
         delete next[key];
-      } else {
-        next[key] = true;
+        return next;
       }
-      saveCycleSnapshot(next, logs).catch(() => {});
-      return next;
+      return { ...prev, [key]: true };
     });
-  }, [logs]);
+  }, []);
 
-  const replacePeriodDates = useCallback((dateKeys: string[]) => {
-    const next: Record<string, true> = {};
-    dateKeys.forEach((key) => {
-      next[key] = true;
-    });
-    setPeriodDates(next);
-    saveCycleSnapshot(next, logs).catch(() => {});
-  }, [logs]);
-
+  // ─── setPeriodDatesForMonth ─────────────────────────────────────────────────
+  // Kept for in-memory use by the AddModal calendar, but callers must call
+  // replacePeriodDates(nextDates) to persist — see _layout.tsx.
   const setPeriodDatesForMonth = useCallback(
     (year: number, month: number, days: number[]) => {
       setPeriodDates((prev) => {
@@ -594,26 +552,10 @@ export function CycleDataProvider({ children }: { children: React.ReactNode }) {
           const key = formatDateKey(new Date(year, month, day));
           next[key] = true;
         });
-        saveCycleSnapshot(next, logs).catch(() => {});
         return next;
       });
     },
-    [logs],
-  );
-
-  const logMoodSymptoms = useCallback(
-    (date: Date, moods: string[], symptoms: string[]) => {
-      const key = formatDateKey(date);
-      setLogs((prev) => {
-        const next = {
-          ...prev,
-          [key]: { moods, symptoms },
-        };
-        saveCycleSnapshot(periodDates, next).catch(() => {});
-        return next;
-      });
-    },
-    [periodDates],
+    [],
   );
 
   const getPeriodDaysForMonth = useCallback(
@@ -648,7 +590,8 @@ export function CycleDataProvider({ children }: { children: React.ReactNode }) {
       );
     }
 
-    const today = normalizeDate(new Date());
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
     const missed: Record<string, true> = {};
 
     predictedStarts.forEach((psKey) => {
@@ -656,15 +599,22 @@ export function CycleDataProvider({ children }: { children: React.ReactNode }) {
       if (psDate.getTime() > today.getTime()) return;
 
       let found = false;
-      const cursor = new Date(psDate.getTime());
       for (let d = 0; d < avgPeriodLength; d += 1) {
-        if (periodDates[formatDateKey(cursor)]) {
+        const key = formatDateKey(
+          new Date(
+            psDate.getFullYear(),
+            psDate.getMonth(),
+            psDate.getDate() + d,
+          ),
+        );
+        if (periodDates[key]) {
           found = true;
           break;
         }
-        cursor.setDate(cursor.getDate() + 1);
       }
-      if (!found) missed[psKey] = true;
+      if (!found) {
+        missed[psKey] = true;
+      }
     });
 
     setMissedPredictedStarts(missed);
@@ -682,15 +632,51 @@ export function CycleDataProvider({ children }: { children: React.ReactNode }) {
       const key = formatDateKey(date);
       for (const psKey of Object.keys(missedPredictedStarts)) {
         const psDate = parseDateKey(psKey);
-        const cursor = new Date(psDate.getTime());
         for (let d = 0; d < avgPeriodLength; d += 1) {
-          if (formatDateKey(cursor) === key) return true;
-          cursor.setDate(cursor.getDate() + 1);
+          const k = formatDateKey(
+            new Date(
+              psDate.getFullYear(),
+              psDate.getMonth(),
+              psDate.getDate() + d,
+            ),
+          );
+          if (k === key) return true;
         }
       }
       return false;
     },
     [missedPredictedStarts, periodDates],
+  );
+
+  const getFertileWindow = useCallback(
+    (predictedStart: Date) => {
+      const meds = profile.medications || [];
+      const hasHormonal = meds.some(
+        (m) =>
+          m.toLowerCase().includes("birth") || m.toLowerCase().includes("horm"),
+      );
+      if (hasHormonal) return null;
+
+      const ovulation = new Date(predictedStart);
+      ovulation.setDate(ovulation.getDate() - 14);
+      const start = new Date(ovulation);
+      start.setDate(start.getDate() - 5);
+      const end = new Date(ovulation);
+      end.setDate(end.getDate() + 1);
+      return { ovulation, fertileStart: start, fertileEnd: end };
+    },
+    [profile.medications],
+  );
+
+  const logMoodSymptoms = useCallback(
+    (date: Date, moods: string[], symptoms: string[]) => {
+      const key = formatDateKey(date);
+      setLogs((prev) => ({
+        ...prev,
+        [key]: { moods, symptoms },
+      }));
+    },
+    [],
   );
 
   const updateProfile = useCallback((patch: Partial<CycleProfile>) => {
@@ -777,6 +763,7 @@ export function CycleDataProvider({ children }: { children: React.ReactNode }) {
       getCycleStats,
       getSymptomFrequencyForMonth,
       resetStore,
+      getFertileWindow,
       fetchRemoteCycles,
       logNewCycle,
       daysLate,
@@ -786,7 +773,6 @@ export function CycleDataProvider({ children }: { children: React.ReactNode }) {
       getSelectedLogDate,
       logModalRequestCount,
       requestLogModal,
-      getRecalcTiming: () => (__DEV__ ? { ...recalcPerfRef.current } : null),
     }),
     [
       periodDates,
@@ -816,17 +802,14 @@ export function CycleDataProvider({ children }: { children: React.ReactNode }) {
       getSelectedLogDate,
       logModalRequestCount,
       requestLogModal,
+      getFertileWindow,
     ],
   );
-
-  // ✅ FIXED: Tracking a numerical dictionary length signature breaks the infinite update cascades,
-  // allowing users to switch months instantly on the insight panel calendar grid with zero lag.
-  const periodDatesLengthSignature = Object.keys(periodDates).length;
 
   useEffect(() => {
     if (!hydrated) return;
     recalcPredictions();
-  }, [hydrated, periodDatesLengthSignature, recalcPredictions]);
+  }, [hydrated, periodDates, recalcPredictions]);
 
   useEffect(() => {
     const keys = Object.keys(predictedDates).sort(
@@ -840,9 +823,12 @@ export function CycleDataProvider({ children }: { children: React.ReactNode }) {
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const upcoming = keys.find((k) => parseDateKey(k).getTime() >= today.getTime()) || keys[0];
+    const upcoming =
+      keys.find((k) => parseDateKey(k).getTime() >= today.getTime()) || keys[0];
     const target = parseDateKey(upcoming);
-    const diff = Math.floor((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    const diff = Math.floor(
+      (target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24),
+    );
 
     if (diff > 0) {
       setPredictionStatus(`Arriving in ${diff} Days`);

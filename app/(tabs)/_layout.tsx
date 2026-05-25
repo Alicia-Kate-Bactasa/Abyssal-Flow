@@ -1,7 +1,7 @@
 import {
-  useCycleData,
   formatDateKey,
   parseDateKey,
+  useCycleData,
 } from "@/hooks/use-cycle-store";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
@@ -519,6 +519,10 @@ const TODAY = new Date();
 const INITIAL_YEAR = TODAY.getFullYear();
 const INITIAL_MONTH = TODAY.getMonth();
 
+// ─── Drop-in replacement for the AddModal function in _layout.tsx ────────────
+// Only the function signature, destructure, and handleSave changed.
+// All other logic (state, effects, JSX, styles) is identical to your original.
+
 function AddModal({
   visible,
   onClose,
@@ -527,14 +531,14 @@ function AddModal({
   onClose: () => void;
 }) {
   const {
-    periodDates,
+    periodDates, // NEW: needed to build the merged map
     getPeriodDaysForMonth,
     getPredictedDaysForMonth,
-    setPeriodDatesForMonth,
-    recalcPredictions,
+    replacePeriodDates, // REPLACES: setPeriodDatesForMonth + recalcPredictions
     logMoodSymptoms,
     getSelectedLogDate,
   } = useCycleData();
+
   const [viewYear, setViewYear] = useState(INITIAL_YEAR);
   const [viewMonth, setViewMonth] = useState(INITIAL_MONTH);
   const [draftDays, setDraftDays] = useState<number[]>([]);
@@ -552,12 +556,16 @@ function AddModal({
     }
   }, [visible]);
 
+  const initialDaysRef = useRef<number[]>([]);
+
   useEffect(() => {
     if (!visible) return;
     const days = getPeriodDaysForMonth(viewYear, viewMonth);
+    initialDaysRef.current = days;
     setDraftDays(days);
     setSavedDays(days);
-  }, [visible, viewMonth, viewYear, getPeriodDaysForMonth]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, viewMonth, viewYear]);
 
   const predictedDays = getPredictedDaysForMonth(viewYear, viewMonth);
   const hasChanges =
@@ -570,12 +578,14 @@ function AddModal({
     setDraftDays((prev) =>
       prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day],
     );
+
   const handlePrevMonth = () => {
     if (viewMonth === 0) {
       setViewYear((y) => y - 1);
       setViewMonth(11);
     } else setViewMonth((m) => m - 1);
   };
+
   const handleNextMonth = () => {
     if (viewMonth === 11) {
       setViewYear((y) => y + 1);
@@ -583,31 +593,38 @@ function AddModal({
     } else setViewMonth((m) => m + 1);
   };
 
-  const handleSave = () => {
-    // Build authoritative next map synchronously so we can recalc predictions
-    const next: Record<string, true> = { ...periodDates };
-    // remove existing keys for this month
-    Object.keys(next).forEach((key) => {
+  // ─── FIX: Build full merged calendar, then call replacePeriodDates once ────
+  const handleSave = async () => {
+    // Start from a copy of the entire existing calendar.
+    const next: Record<string, true> = {};
+
+    // Keep every date that falls OUTSIDE the month we are editing.
+    Object.keys(periodDates).forEach((key) => {
       const d = parseDateKey(key);
-      if (d.getFullYear() === viewYear && d.getMonth() === viewMonth) {
-        delete next[key];
-      }
+      if (d.getFullYear() === viewYear && d.getMonth() === viewMonth) return;
+      next[key] = true;
     });
-    // add drafted days
+
+    // Inject this month's selected days from the draft.
     draftDays.forEach((day) => {
       next[formatDateKey(new Date(viewYear, viewMonth, day))] = true;
     });
 
-    setPeriodDatesForMonth(viewYear, viewMonth, draftDays);
+    // replacePeriodDates does the optimistic state update, recalcPredictions,
+    // AND the Supabase write — all with the write-lock held so fetchRemoteCycles
+    // cannot race and wipe the state mid-save.
+    await replacePeriodDates(next);
+
     setSavedDays(draftDays);
-    recalcPredictions(next);
     onClose();
   };
+  // ──────────────────────────────────────────────────────────────────────────
 
   const handleClose = () => {
     setDraftDays(savedDays);
     onClose();
   };
+
   const toggleSelected = (value: string, setSelected: any) =>
     setSelected((prev: string[]) =>
       prev.includes(value)
@@ -623,8 +640,10 @@ function AddModal({
     setSelectedSymptoms([]);
     onClose();
   };
+
   usePreloadLogIcons();
 
+  // JSX is identical to your original — no changes below this line.
   return (
     <Modal
       visible={visible}

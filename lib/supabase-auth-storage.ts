@@ -1,30 +1,41 @@
-import * as SecureStore from "expo-secure-store";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
-
-const webStorage =
-  Platform.OS === "web" && typeof globalThis.localStorage !== "undefined"
-    ? globalThis.localStorage
-    : null;
 
 export const supabaseAuthStorage = {
   async getItem(key: string) {
-    if (webStorage) {
-      return webStorage.getItem(key);
+    if (Platform.OS === "web") {
+      if (typeof localStorage !== "undefined") return localStorage.getItem(key);
+      return null;
     }
-    return SecureStore.getItemAsync(key);
+    try {
+      return await AsyncStorage.getItem(key);
+    } catch (e) {
+      console.error("AsyncStorage getItem error:", e);
+      return null;
+    }
   },
+
   async setItem(key: string, value: string) {
-    if (webStorage) {
-      webStorage.setItem(key, value);
+    if (Platform.OS === "web") {
+      if (typeof localStorage !== "undefined") localStorage.setItem(key, value);
       return;
     }
-    await SecureStore.setItemAsync(key, value);
+    try {
+      await AsyncStorage.setItem(key, value);
+    } catch (e) {
+      console.error("AsyncStorage setItem error:", e);
+    }
   },
+
   async removeItem(key: string) {
-    if (webStorage) {
-      webStorage.removeItem(key);
+    if (Platform.OS === "web") {
+      if (typeof localStorage !== "undefined") localStorage.removeItem(key);
       return;
     }
-    await SecureStore.deleteItemAsync(key);
+    try {
+      await AsyncStorage.removeItem(key);
+    } catch (e) {
+      console.error("AsyncStorage removeItem error:", e);
+    }
   },
 };

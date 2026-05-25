@@ -10,6 +10,7 @@ import {
   KeyboardAvoidingView,
   Modal,
   Platform,
+  Alert,
   ScrollView,
   StyleSheet,
   Text,
@@ -62,25 +63,33 @@ export default function LoginScreen() {
   };
 
   const handleLogin = async () => {
-    if (!email.trim() || !password) {
-      alert("Please enter both email and password");
-      return;
-    }
+    console.log("🔵 1. Button pressed. Starting spinner...");
     setLoading(true);
+
     try {
-      const { error } = await supabaseClient.auth.signInWithPassword({
-        email: email.trim(),
+      console.log("🔵 2. Checking Environment Variables...");
+      // If these print 'undefined', your app has no idea where your database is!
+      console.log("URL:", process.env.EXPO_PUBLIC_SUPABASE_URL);
+
+      console.log("🔵 3. Reaching out to Supabase...");
+      const { data, error } = await supabaseClient.auth.signInWithPassword({
+        email,
         password,
       });
+
+      console.log("🔵 4. Supabase responded! Error:", error?.message);
+
       if (error) {
-        alert(`Login failed: ${error.message}`);
+        Alert.alert("Login failed", error.message);
         return;
       }
+
+      console.log("🔵 5. Login successful! Routing to dashboard...");
       router.replace("/dashboard");
     } catch (err) {
-      console.error("Login error:", err);
-      alert("Login failed. Please try again.");
+      console.log("🔴 X. Caught a fatal crash:", err);
     } finally {
+      console.log("🔵 6. Running finally block to stop spinner.");
       setLoading(false);
     }
   };

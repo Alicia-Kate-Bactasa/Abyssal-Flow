@@ -1,8 +1,8 @@
 import {
+  buildPeriodRuns,
   formatDateKey,
   parseDateKey,
   useCycleData,
-  buildPeriodRuns,
 } from "@/hooks/use-cycle-store";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
@@ -64,8 +64,6 @@ const formatMonthLabel = (year: number, month: number) =>
     month: "long",
     year: "numeric",
   });
-
-// use store's exported buildPeriodRuns (gap-tolerant)
 
 const TinySpeck = ({
   top,
@@ -221,13 +219,8 @@ const PulsingHeading = ({
 
 export default function CalendarScreen() {
   const insets = useSafeAreaInsets();
-  const {
-    periodDates,
-    predictedDates,
-    replacePeriodDates,
-    getCycleStats,
-    recalcPredictions,
-  } = useCycleData();
+  const { periodDates, predictedDates, replacePeriodDates, getCycleStats } =
+    useCycleData();
 
   const [activeSegment, setActiveSegment] = useState<"calendar" | "pattern">(
     "calendar",
@@ -238,8 +231,51 @@ export default function CalendarScreen() {
 
   const slideAnim = useRef(new Animated.Value(0)).current;
 
+  // isDirtyRef tracks whether the user has unsaved edits in progress.
+  // When true, we block the periodDates → draftDates sync effect so
+  // incoming store updates (from recalcPredictions re-renders) don't
+  // wipe the user's in-progress selection.
+  //
+  // CRITICAL FIX: The flag is only cleared AFTER React has committed the
+  // new periodDates value from replacePeriodDates. We do this by watching
+  // a savedDraftRef that captures the snapshot we passed to replacePeriodDates,
+  // and clearing isDirtyRef in a useEffect that fires when periodDates
+  // actually matches what we saved.
+  const isDirtyRef = useRef(false);
+  // Tracks the exact object we passed to replacePeriodDates so we can
+  // recognise when the store has committed it.
+  const pendingSaveRef = useRef<Record<string, true> | null>(null);
+
+  // Sync global periodDates → local draftDates only when:
+  // 1. There are no pending edits (isDirtyRef is false), OR
+  // 2. The incoming periodDates exactly matches what we just saved
+  //    (i.e. our own save came back — safe to clear the dirty flag).
   useEffect(() => {
-    setDraftDates(periodDates);
+    if (!isDirtyRef.current) {
+      // Normal boot / remote fetch — just mirror the store.
+      setDraftDates({ ...periodDates });
+      return;
+    }
+
+    // Check if this update is our own save coming back.
+    const pending = pendingSaveRef.current;
+    if (pending) {
+      const pendingKeys = Object.keys(pending);
+      const storeKeys = Object.keys(periodDates);
+      const isSameSnapshot =
+        pendingKeys.length === storeKeys.length &&
+        pendingKeys.every((k) => periodDates[k]);
+
+      if (isSameSnapshot) {
+        // Our save has been committed — clear the dirty flag and let
+        // future remote fetches sync normally.
+        isDirtyRef.current = false;
+        pendingSaveRef.current = null;
+        // No need to setDraftDates — it's already showing the saved state.
+      }
+      // else: a different update snuck in while our save was in-flight.
+      // Keep isDirtyRef true — the user's draft is still the truth.
+    }
   }, [periodDates]);
 
   const periodKeys = useMemo(() => Object.keys(periodDates), [periodDates]);
@@ -272,6 +308,7 @@ export default function CalendarScreen() {
   const toggleDraftDate = useCallback(
     (targetYear: number, targetMonth: number, day: number) => {
       Haptics.selectionAsync();
+      isDirtyRef.current = true;
       const key = formatDateKey(new Date(targetYear, targetMonth, day));
       setDraftDates((prev) => {
         const next = { ...prev };
@@ -287,11 +324,24 @@ export default function CalendarScreen() {
   );
 
   const handleSave = () => {
-    // compute authoritative next map from draftKeys and recalc predictions
+    // Build the authoritative snapshot from current draft.
     const next: Record<string, true> = {};
-    draftKeys.forEach((k) => (next[k] = true));
-    replacePeriodDates(draftKeys);
-    recalcPredictions(next);
+    draftKeys.forEach((k) => {
+      next[k] = true;
+    });
+
+    // Record what we're about to save so the sync effect can recognise
+    // when the store has committed it and clear isDirtyRef safely.
+    pendingSaveRef.current = next;
+
+    // replacePeriodDates handles both the optimistic state update
+    // AND the Supabase write — no separate recalcPredictions call needed.
+    replacePeriodDates(next);
+
+    // NOTE: isDirtyRef is NOT cleared here. It is cleared in the useEffect
+    // above once periodDates in the store reflects pendingSaveRef.current.
+    // Clearing it here would race with the re-render that comes from
+    // setPeriodDates inside replacePeriodDates.
   };
 
   const handleTabSwitch = (tab: "calendar" | "pattern") => {

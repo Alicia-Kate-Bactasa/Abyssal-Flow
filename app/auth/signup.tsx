@@ -6,17 +6,18 @@ import { MaterialIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useMemo, useState } from "react";
 import {
-    Dimensions,
-    Image,
-    KeyboardAvoidingView,
-    Modal,
-    Platform,
-    TextInput as RNTextInput,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Dimensions,
+  Image,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Alert,
+  TextInput as RNTextInput,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 export default function SignupScreen() {
@@ -74,48 +75,48 @@ export default function SignupScreen() {
     }
 
     if (!username.trim()) {
-      alert("Username is required");
+      Alert.alert("Error", "Username is required");
       return;
     }
 
     if (password !== confirmPassword) {
-      alert("Passwords do not match");
+      Alert.alert("Error", "Passwords do not match");
       return;
     }
 
     setLoading(true);
-
-    // 1. Call Supabase Auth
-    const { data, error } = await supabaseClient.auth.signUp({
-      email: email.trim().toLowerCase(),
-      password,
-      options: {
-        data: {
-          username: username.trim(),
-          terms_accepted: termsAccepted,
+    try {
+      const { data, error } = await supabaseClient.auth.signUp({
+        email: email.trim().toLowerCase(),
+        password,
+        options: {
+          data: {
+            username: username.trim(),
+            terms_accepted: termsAccepted,
+          },
         },
-      },
-    });
+      });
 
-    setLoading(false);
+      if (error) {
+        Alert.alert("Error", error.message);
+        return;
+      }
 
-    // 2. Handle Errors
-    if (error) {
-      alert(`Signup failed: ${error.message}`);
-      return;
-    }
+      setNickname(username.trim());
+      setUsername(username.trim());
 
-    setNickname(username.trim());
-    setUsername(username.trim());
-
-    // 3. Success!
-    // Since email confirmations are OFF, 'data.session' will instantly exist.
-    // We can skip the verify screen and jump straight into the app!
-    if (data.session) {
-      router.push("/landing");
-    } else {
-      // (Fallback just in case you turn emails back on later)
-      router.push(`/auth/verify-otp?email=${encodeURIComponent(email)}` as any);
+      if (data.session) {
+        router.push("/landing");
+      } else {
+        router.push(
+          `/auth/verify-otp?email=${encodeURIComponent(email)}` as any,
+        );
+      }
+    } catch (err: any) {
+      console.error("Signup error:", err);
+      Alert.alert("Error", err?.message ?? "Signup failed. Please try again.");
+    } finally {
+      setLoading(false);
     }
   };
 
