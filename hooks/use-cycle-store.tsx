@@ -246,13 +246,14 @@ export function CycleDataProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     (async () => {
       try {
-        const snapshot = await loadCycleSnapshot();
+        const snapshot: any = await loadCycleSnapshot();
+
+        // 🛑 We deleted the line that overwrites periodDates here!
+        // period_cycles is now the ONLY boss of the calendar.
+
+        if (snapshot.logs) setLogs(snapshot.logs);
         if (snapshot.profile)
           setProfile((prev) => ({ ...prev, ...snapshot.profile }));
-        // NOTE: We intentionally do NOT restore periodDates from the
-        // cycle-sync snapshot here. Period dates are the source of truth in
-        // period_cycles and are loaded via fetchRemoteCycles below.
-        if (snapshot.logs) setLogs(snapshot.logs);
       } catch {
         // ignore
       } finally {
@@ -360,10 +361,8 @@ export function CycleDataProvider({ children }: { children: React.ReactNode }) {
   // cannot race and overwrite state while the upsert is pending.
   const replacePeriodDates = useCallback(
     async (newDates: Record<string, true>) => {
-      // 1. Acquire write-lock BEFORE touching any state.
       saveInFlightRef.current = true;
 
-      // 2. Optimistic local update so the UI reflects changes immediately.
       setPeriodDates(newDates);
       recalcPredictions(newDates);
 
@@ -373,7 +372,6 @@ export function CycleDataProvider({ children }: { children: React.ReactNode }) {
         } = await supabaseClient.auth.getUser();
         if (!user) return;
 
-        // 3. Group individual dates into contiguous runs for storage.
         const keys = Object.keys(newDates);
         const runs = buildPeriodRuns(keys);
 
@@ -381,26 +379,33 @@ export function CycleDataProvider({ children }: { children: React.ReactNode }) {
           user_id: user.id,
           start_date: run[0],
           end_date: run[run.length - 1],
-          source: "manual",
         }));
 
-        // 4. Delete-then-upsert is the safest replace pattern for Supabase.
-        //    We await each step so we never release the lock on a partial write.
-        await supabaseClient
+        // 1. Delete the old dates
+        const { error: deleteError } = await supabaseClient
           .from("period_cycles")
           .delete()
           .eq("user_id", user.id);
 
+        if (deleteError) {
+          console.error("❌ Supabase Delete Error:", deleteError);
+        }
+
+        // 2. INSERT the new dates (Switched from upsert!)
         if (rowsToInsert.length > 0) {
-          await supabaseClient.from("period_cycles").upsert(rowsToInsert);
+          const { error: insertError } = await supabaseClient
+            .from("period_cycles")
+            .insert(rowsToInsert);
+
+          if (insertError) {
+            console.error("❌ Supabase Insert Error:", insertError);
+          } else {
+            console.log("✅ Successfully forced dates into Supabase!");
+          }
         }
       } catch (err) {
         console.error("Cloud sync failed:", err);
-        // State is already updated optimistically — don't revert so the user
-        // doesn't see a confusing flash. The next fetchRemoteCycles (e.g. on
-        // next app open) will reconcile if the write partially failed.
       } finally {
-        // 5. Release write-lock only after the Supabase round-trip finishes.
         saveInFlightRef.current = false;
       }
     },
@@ -448,16 +453,12 @@ export function CycleDataProvider({ children }: { children: React.ReactNode }) {
   const fetchInFlightRef = useRef(false);
 
   const fetchRemoteCycles = useCallback(async () => {
-    // Hard bail if a save is in progress — local state is the truth right now.
-    if (saveInFlightRef.current) return;
-    if (fetchInFlightRef.current) return;
-
+    if (fetchInFlightRef.current || saveInFlightRef.current) return;
     fetchInFlightRef.current = true;
     try {
       const {
         data: { user },
       } = await supabaseClient.auth.getUser();
-
       if (!user) return;
 
       const { data, error } = await supabaseClient
@@ -466,12 +467,12 @@ export function CycleDataProvider({ children }: { children: React.ReactNode }) {
         .eq("user_id", user.id);
 
       if (error) {
-        console.error("Failed to load period_cycles:", error);
+        console.error("❌ Failed to load period_cycles:", error);
         return;
       }
 
-      // One final check: if a save started while we were awaiting, discard
-      // the remote result — it may predate the in-flight upsert.
+      console.log("📥 Downloaded from Supabase:", data); // Let's prove it arrived!
+
       if (saveInFlightRef.current) return;
 
       const next: Record<string, true> = {};
@@ -500,13 +501,23 @@ export function CycleDataProvider({ children }: { children: React.ReactNode }) {
 
   const initialFetchDoneRef = useRef(false);
   useEffect(() => {
-    if (!hydrated) return;
-    if (initialFetchDoneRef.current) return;
-    initialFetchDoneRef.current = true;
-    fetchRemoteCycles().catch(() => {
-      initialFetchDoneRef.current = false;
-    });
-  }, [hydrated, fetchRemoteCycles]);
+    const { data: authListener } = supabaseClient.auth.onAuthStateChange(
+      (event, session) => {
+        if (event === "SIGNED_IN") {
+          // User logged in! Unlock the fetcher and grab their data immediately
+          initialFetchDoneRef.current = false;
+          fetchRemoteCycles();
+        } else if (event === "SIGNED_OUT") {
+          // User logged out. Instantly wipe the screen and reset the lock
+          resetStore();
+          initialFetchDoneRef.current = false;
+        }
+      },
+    );
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, [fetchRemoteCycles, resetStore]);
 
   // ─── Persist logs (NOT periodDates) to cycle-sync on change ────────────────
   // We only sync logs here — period dates are managed exclusively via
@@ -577,48 +588,53 @@ export function CycleDataProvider({ children }: { children: React.ReactNode }) {
   );
 
   useEffect(() => {
-    if (!predictedStarts.length) {
-      setMissedPredictedStarts({});
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // 1. Check if we missed a predicted start date (The user is late!)
+    const missedKeys = Object.keys(missedPredictedStarts).sort(
+      (a, b) => parseDateKey(b).getTime() - parseDateKey(a).getTime(),
+    );
+
+    if (missedKeys.length > 0) {
+      const mostRecentMiss = parseDateKey(missedKeys[0]);
+      const diff = Math.floor(
+        (today.getTime() - mostRecentMiss.getTime()) / (1000 * 60 * 60 * 24),
+      );
+
+      if (diff > 0) {
+        setPredictionStatus(`${diff} Days Late`);
+        setDaysLate(diff);
+        return; // Stop here, don't calculate upcoming dates!
+      }
+    }
+
+    // 2. If not late, calculate normal upcoming dates
+    const keys = Object.keys(predictedDates).sort(
+      (a, b) => parseDateKey(a).getTime() - parseDateKey(b).getTime(),
+    );
+
+    if (!keys.length) {
+      setPredictionStatus("Unknown");
+      setDaysLate(0);
       return;
     }
 
-    const runs = buildPeriodRuns(Object.keys(periodDates));
-    let avgPeriodLength = defaultPeriodLength;
-    if (runs.length) {
-      avgPeriodLength = Math.round(
-        runs.reduce((sum, run) => sum + run.length, 0) / runs.length,
-      );
+    const upcoming =
+      keys.find((k) => parseDateKey(k).getTime() >= today.getTime()) || keys[0];
+    const target = parseDateKey(upcoming);
+    const diff = Math.floor(
+      (target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24),
+    );
+
+    if (diff > 0) {
+      setPredictionStatus(`Arriving in ${diff} Days`);
+      setDaysLate(0);
+    } else if (diff === 0) {
+      setPredictionStatus("Arriving today");
+      setDaysLate(0);
     }
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const missed: Record<string, true> = {};
-
-    predictedStarts.forEach((psKey) => {
-      const psDate = parseDateKey(psKey);
-      if (psDate.getTime() > today.getTime()) return;
-
-      let found = false;
-      for (let d = 0; d < avgPeriodLength; d += 1) {
-        const key = formatDateKey(
-          new Date(
-            psDate.getFullYear(),
-            psDate.getMonth(),
-            psDate.getDate() + d,
-          ),
-        );
-        if (periodDates[key]) {
-          found = true;
-          break;
-        }
-      }
-      if (!found) {
-        missed[psKey] = true;
-      }
-    });
-
-    setMissedPredictedStarts(missed);
-  }, [predictedStarts, periodDates]);
+  }, [predictedDates, missedPredictedStarts]);
 
   const isDateInMissedPredictedWindow = useCallback(
     (date: Date) => {
@@ -729,7 +745,15 @@ export function CycleDataProvider({ children }: { children: React.ReactNode }) {
       Object.entries(logs).forEach(([key, entry]) => {
         const date = parseDateKey(key);
         if (!isSameMonth(date, year, month)) return;
-        entry.symptoms.forEach((symptom) => {
+
+        // THE BULLETPROOF FIX:
+        // We strictly check if it's an Array. If it's a string, undefined, or
+        // anything else weird from the database, we force it to be an empty array.
+        const symptomsList = Array.isArray(entry.symptoms)
+          ? entry.symptoms
+          : [];
+
+        symptomsList.forEach((symptom) => {
           tally.set(symptom, (tally.get(symptom) ?? 0) + 1);
         });
       });

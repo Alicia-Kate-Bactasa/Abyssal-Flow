@@ -7,9 +7,12 @@ type DayRecord = {
   symptoms?: string[];
 };
 
+// 1. We added moods and symptoms to the expected Supabase response
 type SupabaseRow = {
   log_date: string;
   source: string | null;
+  moods: string[] | null;
+  symptoms: string[] | null;
 };
 
 const HEALTH_ID_TO_KEY: Record<number, string> = {
@@ -81,12 +84,13 @@ const buildStoredRows = (
     });
   });
 
-  // Persist as the simple 'manual' source to match existing onboarding rows
-  // and satisfy DB check constraints. We currently don't persist per-day moods/
-  // symptoms to the `period_logs.source` column to avoid violating the schema.
-  return Array.from(rows.entries()).map(([log_date]) => ({
+  // 2. We send "manual" to keep the Bouncer happy, and send the moods/symptoms
+  // directly to your brand new columns!
+  return Array.from(rows.entries()).map(([log_date, record]) => ({
     log_date,
     source: "manual",
+    moods: record.moods ?? [],
+    symptoms: record.symptoms ?? [],
   }));
 };
 
@@ -107,23 +111,48 @@ export async function loadCycleSnapshot() {
     };
   }
 
-  const [profileResult, periodResult, healthResult, medicationResult, symptomResult, moodResult, foodResult] =
-    await Promise.all([
-      supabaseClient
-        .from("profiles")
-        .select("nickname,birthday,cycle_regularity,cycle_length,typical_flow,medical_checkups")
-        .eq("id", userId)
-        .maybeSingle(),
-      supabaseClient
-        .from("period_logs")
-        .select("log_date,source")
-        .eq("user_id", userId),
-      supabaseClient.from("profile_health_history").select("item_id").eq("user_id", userId),
-      supabaseClient.from("profile_medications").select("item_id").eq("user_id", userId),
-      supabaseClient.from("profile_symptoms").select("item_id").eq("user_id", userId),
-      supabaseClient.from("profile_moods").select("item_id").eq("user_id", userId),
-      supabaseClient.from("profile_comfort_food").select("item_id").eq("user_id", userId),
-    ]);
+  // 3. We explicitly ask Supabase to return the new moods and symptoms columns
+  const [
+    profileResult,
+    periodResult,
+    healthResult,
+    medicationResult,
+    symptomResult,
+    moodResult,
+    foodResult,
+  ] = await Promise.all([
+    supabaseClient
+      .from("profiles")
+      .select(
+        "nickname,birthday,cycle_regularity,cycle_length,typical_flow,medical_checkups",
+      )
+      .eq("id", userId)
+      .maybeSingle(),
+    supabaseClient
+      .from("period_logs")
+      .select("log_date,source,moods,symptoms")
+      .eq("user_id", userId),
+    supabaseClient
+      .from("profile_health_history")
+      .select("item_id")
+      .eq("user_id", userId),
+    supabaseClient
+      .from("profile_medications")
+      .select("item_id")
+      .eq("user_id", userId),
+    supabaseClient
+      .from("profile_symptoms")
+      .select("item_id")
+      .eq("user_id", userId),
+    supabaseClient
+      .from("profile_moods")
+      .select("item_id")
+      .eq("user_id", userId),
+    supabaseClient
+      .from("profile_comfort_food")
+      .select("item_id")
+      .eq("user_id", userId),
+  ]);
 
   const periodDates: Record<string, true> = {};
   const logs: Record<string, LogEntry> = {};
@@ -133,10 +162,21 @@ export async function loadCycleSnapshot() {
     if (decoded.period) {
       periodDates[row.log_date] = true;
     }
-    if ((decoded.moods?.length ?? 0) || (decoded.symptoms?.length ?? 0)) {
+
+    // 4. We pull from the new columns directly!
+    const rowMoods = row.moods ?? [];
+    const rowSymptoms = row.symptoms ?? [];
+
+    // We keep the 'decoded' fallback just in case you have old historical data
+    const finalMoods = rowMoods.length ? rowMoods : (decoded.moods ?? []);
+    const finalSymptoms = rowSymptoms.length
+      ? rowSymptoms
+      : (decoded.symptoms ?? []);
+
+    if (finalMoods.length || finalSymptoms.length) {
       logs[row.log_date] = {
-        moods: decoded.moods ?? [],
-        symptoms: decoded.symptoms ?? [],
+        moods: finalMoods,
+        symptoms: finalSymptoms,
       };
     }
   });
@@ -161,8 +201,7 @@ export async function loadCycleSnapshot() {
     comfortFood: (foodResult.data ?? [])
       .map((row) => FOOD_ID_TO_KEY[row.item_id as number])
       .filter(Boolean),
-    cycleLength:
-      Number(profileResult.data?.cycle_length) || 28,
+    cycleLength: Number(profileResult.data?.cycle_length) || 28,
   } as Partial<CycleProfile>;
 
   return {
@@ -178,7 +217,7 @@ export async function saveCycleSnapshot(
   logs: Record<string, LogEntry>,
 ) {
   const userId = await safeAuthUserId();
-  if (!userId) return;
+  if (!userId) return; // Silent fail if not logged in
 
   const rows = buildStoredRows(periodDates, logs);
   const { data: existingRows, error: loadError } = await supabaseClient
@@ -191,17 +230,18 @@ export async function saveCycleSnapshot(
     return;
   }
 
+  // 5. We map the data straight into your new columns!
   const { error: upsertError } = rows.length
-    ? await supabaseClient
-        .from("period_logs")
-        .upsert(
-          rows.map((row) => ({
-            user_id: userId,
-            log_date: row.log_date,
-            source: row.source,
-          })),
-          { onConflict: "user_id,log_date" },
-        )
+    ? await supabaseClient.from("period_logs").upsert(
+        rows.map((row) => ({
+          user_id: userId,
+          log_date: row.log_date,
+          source: row.source,
+          moods: row.moods,
+          symptoms: row.symptoms,
+        })),
+        { onConflict: "user_id,log_date" },
+      )
     : { error: null };
 
   if (upsertError) {

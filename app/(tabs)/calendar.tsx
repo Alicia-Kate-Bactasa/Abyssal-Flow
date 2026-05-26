@@ -246,6 +246,15 @@ export default function CalendarScreen() {
   // recognise when the store has committed it.
   const pendingSaveRef = useRef<Record<string, true> | null>(null);
 
+  useEffect(() => {
+    // If the user has tapped the calendar but hasn't pressed save yet,
+    // we do NOT want to overwrite their active work.
+    if (isDirtyRef.current) return;
+
+    // Otherwise, always update the calendar to match the global database!
+    setDraftDates(periodDates);
+  }, [periodDates]);
+
   // Sync global periodDates → local draftDates only when:
   // 1. There are no pending edits (isDirtyRef is false), OR
   // 2. The incoming periodDates exactly matches what we just saved
