@@ -10,9 +10,9 @@ Traditional period trackers can often feel clinical, rigid, or overwhelming. **A
 Seamless and secure login and sign-up interfaces wrapped in deep-sea ambient aesthetics.
 
 <p align="center">
-  <img src="assets/forReadMe/logIn.PNG" width="45%" alt="Return to the Deep - Login" />
+  <img src="assets/forReadMe/logIn.PNG" width="20%" alt="Return to the Deep - Login" />
   &nbsp;&nbsp;&nbsp;&nbsp;
-  <img src="assets/forReadMe/signIn.PNG" width="45%" alt="Dive in - Sign Up" />
+  <img src="assets/forReadMe/signIn.PNG" width="20%" alt="Dive in - Sign Up" />
 </p>
 
 * **Return to the Deep (Login):** Secure email and password authentication powered by Supabase Auth.
@@ -45,7 +45,7 @@ The main dashboard visually shifts colors, gradients, and wave animations to ref
 Take complete control of your cycle data with an intuitive, all-in-one logging modal.
 
 <p align="center">
-  <img src="assets/forReadMe/mainDashboardModal.PNG" width="60%" alt="Period & Symptom Logging Modal" />
+  <img src="assets/forReadMe/mainDashboardModal.PNG" width="20%" alt="Period & Symptom Logging Modal" />
 </p>
 
 * **Interactive Calendar:** Tap dates to easily mark period start and end times.
@@ -58,11 +58,11 @@ Take complete control of your cycle data with an intuitive, all-in-one logging m
 Gain deeper insight into your cycle patterns, historical trends, and future predictions.
 
 <p align="center">
-  <img src="assets/forReadMe/calendar1.PNG" width="30%" alt="Cosmic Chart - Tide Tracker" />
+  <img src="assets/forReadMe/calendar1.PNG" width="20%" alt="Cosmic Chart - Tide Tracker" />
   &nbsp;
-  <img src="assets/forReadMe/calendar2.PNG" width="30%" alt="Cosmic Chart - Deep Patterns" />
+  <img src="assets/forReadMe/calendar2.PNG" width="20%" alt="Cosmic Chart - Deep Patterns" />
   &nbsp;
-  <img src="assets/forReadMe/analytics.PNG" width="30%" alt="Oceanic Summary & Insights" />
+  <img src="assets/forReadMe/analytics.PNG" width="20%" alt="Oceanic Summary & Insights" />
 </p>
 
 * **Tide Tracker (Calendar View):** Visual monthly calendar highlighting flow days, fertile windows, and expected upcoming cycles.
