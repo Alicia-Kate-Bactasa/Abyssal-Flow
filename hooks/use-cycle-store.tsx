@@ -1,4 +1,5 @@
-import { supabaseClient } from "@/lib/supabase";
+import { getCachedAuthUser } from "../lib/auth-session";
+import { supabaseClient } from "../lib/supabase";
 import React, {
   createContext,
   useCallback,
@@ -193,9 +194,7 @@ export function CycleDataProvider({ children }: { children: React.ReactNode }) {
   const [daysLate, setDaysLate] = useState<number>(0);
   const [predictionStatus, setPredictionStatus] = useState<string>("");
   const [predictedStarts, setPredictedStarts] = useState<string[]>([]);
-  const [missedPredictedStarts, setMissedPredictedStarts] = useState<
-    Record<string, true>
-  >({});
+  const [missedPredictedStarts] = useState<Record<string, true>>({});
   const [selectedLogDate, setSelectedLogDateState] = useState<Date | null>(
     null,
   );
@@ -351,7 +350,6 @@ export function CycleDataProvider({ children }: { children: React.ReactNode }) {
       periodDates,
       profile.cycleLength,
       profile.cycleRegularity,
-      profile.medications,
     ],
   );
 
@@ -367,9 +365,7 @@ export function CycleDataProvider({ children }: { children: React.ReactNode }) {
       recalcPredictions(newDates);
 
       try {
-        const {
-          data: { user },
-        } = await supabaseClient.auth.getUser();
+        const user = await getCachedAuthUser();
         if (!user) return;
 
         const keys = Object.keys(newDates);
@@ -456,9 +452,7 @@ export function CycleDataProvider({ children }: { children: React.ReactNode }) {
     if (fetchInFlightRef.current || saveInFlightRef.current) return;
     fetchInFlightRef.current = true;
     try {
-      const {
-        data: { user },
-      } = await supabaseClient.auth.getUser();
+      const user = await getCachedAuthUser();
       if (!user) return;
 
       const { data, error } = await supabaseClient
@@ -827,6 +821,9 @@ export function CycleDataProvider({ children }: { children: React.ReactNode }) {
       logModalRequestCount,
       requestLogModal,
       getFertileWindow,
+      predictedStarts,
+      missedPredictedStarts,
+      isDateInMissedPredictedWindow,
     ],
   );
 

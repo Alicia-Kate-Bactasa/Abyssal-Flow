@@ -1,13 +1,11 @@
 import { useUser } from "@/hooks/use-user-store";
-import { supabaseClient } from "@/lib/supabase";
+import { getCachedAuthUser } from "../../lib/auth-session";
+import { supabaseClient } from "../../lib/supabase";
 import * as ImagePicker from "expo-image-picker";
-import * as FileSystem from "expo-file-system"; // <-- ADD THIS
-import { decode } from "base64-arraybuffer"; // <-- ADD THIS
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
-  Dimensions,
   Image,
   Modal,
   Pressable,
@@ -49,8 +47,8 @@ export default function ProfileScreen() {
 
   // 2. Your existing email fetcher
   useEffect(() => {
-    supabaseClient.auth.getUser().then(({ data }) => {
-      if (data.user) setEmail(data.user.email || "");
+    getCachedAuthUser().then((user) => {
+      if (user) setEmail(user.email || "");
     });
   }, []);
 

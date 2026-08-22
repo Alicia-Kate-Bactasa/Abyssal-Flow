@@ -1,4 +1,5 @@
-import { supabaseClient } from "@/lib/supabase";
+import { getCachedAuthUser } from "../lib/auth-session";
+import { supabaseClient } from "../lib/supabase";
 
 export type OnboardingPayload = {
   nickname: string;
@@ -23,11 +24,8 @@ export async function submitOnboarding(
     JSON.stringify(payload, null, 2),
   );
   // 1 — Resolve the current user. Session is guaranteed active at this point.
-  const {
-    data: { user },
-    error: userErr,
-  } = await supabaseClient.auth.getUser();
-  if (userErr || !user) throw new Error("Not authenticated");
+  const user = await getCachedAuthUser();
+  if (!user) throw new Error("Not authenticated");
   const uid = user.id;
 
   // ── 2: Update scalar fields on the profiles row ──────────────────────────

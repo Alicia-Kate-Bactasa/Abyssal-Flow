@@ -1,4 +1,5 @@
-import { supabaseClient } from "@/lib/supabase";
+import { getCachedAuthUser } from "./auth-session";
+import { supabaseClient } from "./supabase";
 import type { CycleProfile, LogEntry } from "../hooks/use-cycle-store";
 
 type DayRecord = {
@@ -95,9 +96,8 @@ const buildStoredRows = (
 };
 
 const safeAuthUserId = async () => {
-  const { data, error } = await supabaseClient.auth.getUser();
-  if (error || !data.user) return null;
-  return data.user.id;
+  const user = await getCachedAuthUser();
+  return user?.id ?? null;
 };
 
 export async function loadCycleSnapshot() {

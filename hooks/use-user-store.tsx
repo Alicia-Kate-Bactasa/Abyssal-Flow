@@ -1,4 +1,5 @@
-import { supabaseClient } from "@/lib/supabase";
+import { getCachedAuthUser } from "../lib/auth-session";
+import { supabaseClient } from "../lib/supabase";
 import React, { createContext, useContext, useEffect, useState } from "react";
 import * as SecureStore from "expo-secure-store";
 type User = {
@@ -33,17 +34,13 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       await SecureStore.deleteItemAsync("user_data"); // Use your actual storage key here
     };
     clearOldData();
-    let active = true;
-
     const fetchFreshProfile = async () => {
       try {
-        const {
-          data: { user: authUser },
-        } = await supabaseClient.auth.getUser();
+        const authUser = await getCachedAuthUser();
         if (!authUser) return;
 
         // Fetch the REAL profile from the table, not just metadata
-        const { data: profile, error } = await supabaseClient
+        const { data: profile } = await supabaseClient
           .from("profiles")
           .select("*")
           .eq("id", authUser.id)
@@ -68,7 +65,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       async (_event, session) => {
         if (session?.user) {
           // CALL THE DATABASE, NOT THE METADATA
-          const { data: profile, error } = await supabaseClient
+          const { data: profile } = await supabaseClient
             .from("profiles")
             .select("id, nickname, description, avatar_url")
             .eq("id", session.user.id)
@@ -95,7 +92,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     );
 
     return () => {
-      active = false;
       authListener.subscription.unsubscribe();
     };
   }, []);
@@ -111,8 +107,9 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       setUser((prev) => ({ ...prev, ...updates }));
 
       const {
-        data: { user: authUser },
-      } = await supabaseClient.auth.getUser();
+        data: { session },
+      } = await supabaseClient.auth.getSession();
+      const authUser = session?.user;
       if (!authUser) throw new Error("No user logged in");
 
       // Only send columns that actually exist in your table
