@@ -8,7 +8,7 @@ Traditional period trackers can often feel clinical, rigid, or overwhelming. **A
 
 ## 📸 App Showcase & Screenshots
 
-### 🔑 Authentication & Onboarding
+### Authentication & Onboarding
 Seamless and secure login and sign-up interfaces wrapped in deep-sea ambient aesthetics.
 
 <p align="center">
@@ -22,22 +22,19 @@ Seamless and secure login and sign-up interfaces wrapped in deep-sea ambient aes
 
 ---
 
-### 🌊 Dynamic Ocean Dashboard & Cycle Phases
+### Dynamic Ocean Dashboard & Cycle Phases
 The main dashboard visually shifts colors, gradients, and wave animations to reflect your current cycle phase in real time.
 
 <p align="center">
-  <img src="assets/forReadMe/mainDashboard3.PNG" width="30%" alt="Menstrual Phase" />
+  <img src="assets/forReadMe/mainDashboard4.PNG" width="25%" alt="Luteal Phase Late" />
   &nbsp;
-  <img src="assets/forReadMe/mainDashboard2.PNG" width="30%" alt="Follicular Phase" />
+  <img src="assets/forReadMe/mainDashboard3.PNG" width="25%" alt="Menstrual Phase" />
   &nbsp;
-  <img src="assets/forReadMe/mainDashboard5.PNG" width="30%" alt="Ovulation Phase" />
+  <img src="assets/forReadMe/mainDashboard2.PNG" width="25%" alt="Follicular Phase" />
+  &nbsp;
+  <img src="assets/forReadMe/mainDashboard5.PNG" width="25%" alt="Ovulation Phase" />
 </p>
 
-<p align="center">
-  <img src="assets/forReadMe/mainDashboard1.PNG" width="45%" alt="Luteal Phase Early" />
-  &nbsp;&nbsp;&nbsp;&nbsp;
-  <img src="assets/forReadMe/mainDashboard4.PNG" width="45%" alt="Luteal Phase Late" />
-</p>
 
 * 🌑 **Menstrual Phase (Stormy Deep):** Dark navy ocean depths encouraging rest, shedding, and quiet reflection.
 * 🌅 **Follicular Phase (Rebuilding Light):** Warm coral and gold gradients representing rising energy and renewal.
@@ -46,7 +43,7 @@ The main dashboard visually shifts colors, gradients, and wave animations to ref
 
 ---
 
-### 📝 Cycle & Symptom Logging
+### Cycle & Symptom Logging
 Take complete control of your cycle data with an intuitive, all-in-one logging modal.
 
 <p align="center">
@@ -59,7 +56,7 @@ Take complete control of your cycle data with an intuitive, all-in-one logging m
 
 ---
 
-### 📅 Cosmic Chart & Oceanic Analytics
+### Cosmic Chart & Oceanic Analytics
 Gain deeper insight into your cycle patterns, historical trends, and future predictions.
 
 <p align="center">
@@ -76,7 +73,7 @@ Gain deeper insight into your cycle patterns, historical trends, and future pred
 
 ---
 
-## 🛠 Tech Stack & Architecture
+## Tech Stack & Architecture
 
 | Layer | Technologies Used |
 | :--- | :--- |
@@ -92,53 +89,12 @@ Gain deeper insight into your cycle patterns, historical trends, and future pred
 
 ## ✨ Key Features
 
-* 🌊 **Dynamic Ocean State UI:** Visual atmosphere and theme colors dynamically shift based on cycle phase (Menstrual, Follicular, Ovulation, Luteal).
-* 📅 **Cycle Prediction & Tracking:** Accurate cycle length calculation, period forecasting, and fertile window estimations.
-* 📝 **Full CRUD Log Management:** Seamlessly add, edit, or delete period dates, daily moods, and physical symptoms.
-* 📊 **Deep Pattern Analytics:** Comprehensive historical analytics, average cycle statistics, and symptom trends.
-* ☁️ **Cloud Synchronization:** Secure multi-device data sync with Supabase PostgreSQL and instant local persistence via AsyncStorage.
-* 🎨 **Mindful & Stress-Free Design:** Soothing deep-sea color palette, smooth wave animations, and peaceful UX designed to reduce tracking fatigue.
-
----
-
-## 🚀 Getting Started
-
-### Prerequisites
-
-Ensure you have the following installed on your development machine:
-* [Node.js](https://nodejs.org/) (v18 or higher recommended)
-* [npm](https://www.npmjs.com/) or [yarn](https://yarnpkg.com/)
-* [Expo Go](https://expo.dev/go) app on your iOS/Android device OR an iOS Simulator / Android Emulator.
-
-### Installation
-
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/Alicia-Kate-Bactasa/EduTrade.git
-   cd AbssyalFlow
-   ```
-
-2. **Install dependencies:**
-   ```bash
-   npm install
-   ```
-
-3. **Configure Environment Variables:**
-   Create a `.env` file in the root directory and add your Supabase credentials:
-   ```env
-   EXPO_PUBLIC_SUPABASE_URL=your_supabase_project_url
-   EXPO_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-   ```
-
-4. **Start the development server:**
-   ```bash
-   npx expo start
-   ```
-
-5. **Run on your device:**
-   - Scan the QR code with **Expo Go** (Android) or the **Camera app** (iOS).
-   - Press `i` to open in iOS Simulator or `a` for Android Emulator.
-
+* **Dynamic Ocean State UI:** Visual atmosphere and theme colors dynamically shift based on cycle phase (Menstrual, Follicular, Ovulation, Luteal).
+* **Cycle Prediction & Tracking:** Accurate cycle length calculation, period forecasting, and fertile window estimations.
+* **Full CRUD Log Management:** Seamlessly add, edit, or delete period dates, daily moods, and physical symptoms.
+* **Deep Pattern Analytics:** Comprehensive historical analytics, average cycle statistics, and symptom trends.
+* **Cloud Synchronization:** Secure multi-device data sync with Supabase PostgreSQL and instant local persistence via AsyncStorage.
+* **Mindful & Stress-Free Design:** Soothing deep-sea color palette, smooth wave animations, and peaceful UX designed to reduce tracking fatigue.
 ---
 
 ## 📄 License
