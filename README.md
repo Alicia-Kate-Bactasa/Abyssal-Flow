@@ -24,13 +24,13 @@ Seamless and secure login and sign-up interfaces wrapped in deep-sea ambient aes
 The main dashboard visually shifts colors, gradients, and wave animations to reflect your current cycle phase in real time.
 
 <p align="center">
-  <img src="assets/forReadMe/mainDashboard4.PNG" width="25%" alt="Luteal Phase Late" />
+  <img src="assets/forReadMe/mainDashboard4.PNG" width="20%" alt="Luteal Phase Late" />
   &nbsp;
-  <img src="assets/forReadMe/mainDashboard3.PNG" width="25%" alt="Menstrual Phase" />
+  <img src="assets/forReadMe/mainDashboard3.PNG" width="20%" alt="Menstrual Phase" />
   &nbsp;
-  <img src="assets/forReadMe/mainDashboard2.PNG" width="25%" alt="Follicular Phase" />
+  <img src="assets/forReadMe/mainDashboard2.PNG" width="20%" alt="Follicular Phase" />
   &nbsp;
-  <img src="assets/forReadMe/mainDashboard5.PNG" width="25%" alt="Ovulation Phase" />
+  <img src="assets/forReadMe/mainDashboard5.PNG" width="20%" alt="Ovulation Phase" />
 </p>
 
 
