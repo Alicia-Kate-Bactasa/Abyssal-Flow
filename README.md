@@ -6,8 +6,6 @@ Traditional period trackers can often feel clinical, rigid, or overwhelming. **A
 
 ---
 
-## 📸 App Showcase & Screenshots
-
 ### Authentication & Onboarding
 Seamless and secure login and sign-up interfaces wrapped in deep-sea ambient aesthetics.
 
